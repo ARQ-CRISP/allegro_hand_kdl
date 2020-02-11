@@ -1,0 +1,17 @@
+<launch>
+
+  <arg name="LABEL" default="0" />
+
+  <arg name="NUM" default="0"/>
+
+  <node name="fk_publisher_$(arg LABEL)"
+        type="fk_publisher"
+        pkg="allegro_hand_kdl"
+        output="screen">
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="pose_array" to="allegroHand_$(arg NUM)/pose_array"/>
+  </node>
+
+</launch>

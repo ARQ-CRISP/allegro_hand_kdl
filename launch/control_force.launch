@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="LABEL" default="0" />
+
+  <arg name="NUM" default="0"/>
+
+  <arg name="INPUT_TOPIC" default="cartesian_forces" />
+  <arg name="TORQUE_TOPIC" default="allegro_torque"/>
+
+  <node name="control_force_$(arg LABEL)"
+        type="control_force"
+        pkg="allegro_hand_kdl"
+        output="screen">
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="cartesian_forces" to="$(arg INPUT_TOPIC)"/>
+    <remap from="allegro_torque" to="$(arg TORQUE_TOPIC)"/>
+
+  </node>
+
+</launch>

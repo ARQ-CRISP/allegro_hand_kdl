@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="LABEL" default="0" />
+
+  <arg name="NUM" default="0"/>
+
+  <arg name="robot_base" default="world"/>
+  <arg name="hand_base" default="hand_root"/>
+
+  <node name="base_pose_publisher_$(arg LABEL)"
+        type="base_pose_publisher"
+        pkg="allegro_hand_kdl"
+        output="screen">
+
+    <param name="robot_base" value="$(arg robot_base)"/>
+    <param name="hand_base" value="$(arg hand_base)"/>
+
+    <remap from="base_pose" to="allegroHand_$(arg NUM)/base_pose"/>
+
+  </node>
+
+</launch>

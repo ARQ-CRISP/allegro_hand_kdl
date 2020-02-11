@@ -1,0 +1,35 @@
+# Pre-defined fingertip cartesian poses.
+# pose entries should follow the pattern p0,p1...
+# finger pos w.r.t.
+# rotations are in Euler format
+cartesian_poses:
+  p0:
+    name: wide_open
+    state:
+      f0:
+        pos: {x: 0.0704, y: 0.0564, z: 0.1285}
+        rot: {x: 0.9956, y: 0.0682, z: -0.0429, w: 0.0468}
+      f1:
+        pos: {x: 0.0815, y: -0.0002, z: 0.1390}
+        rot: {x: 0.9809, y: -0.0008, z: 0.1944, w: 0.0009}
+      f2:
+        pos: {x: 0.0689, y: -0.0519, z: 0.1396}
+        rot: {x: 0.9860, y: -0.0378, z: 0.1579, w: -0.0373}
+      f3:
+        pos: {x: 0.0687, y: 0.1170, z: 0.0563}
+        rot: {x: 0.1961, y: 0.0134, z: 0.4522, w: 0.8699}
+  p1:
+    name: relax
+    state:
+      f0:
+        pos: {x: 0.0935, y: 0.0873, z: 0.1425}
+        rot: {x: 0.9597, y: 0.2028, z: 0.1940, w: 0.0015}
+      f1:
+        pos: {x: 0.1064, y: 0.0092, z: 0.1627}
+        rot: {x: 0.9020, y: 0.0393, z: 0.4294, w: -0.0178}
+      f2:
+        pos: {x: 0.0979, y: -0.0651, z: 0.1759}
+        rot: {x: 0.8645, y: -0.0846, z: 0.4953, w: -0.0005}
+      f3:
+        pos: {x: 0.1313, y: 0.0571, z: 0.0233}
+        rot: {x: -0.0800, y: 0.2823, z: 0.1284, w: 0.9472}

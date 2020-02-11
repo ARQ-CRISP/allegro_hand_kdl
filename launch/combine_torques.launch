@@ -1,0 +1,89 @@
+<launch>
+
+  <arg name="NUM" default="0"/>
+  <arg name="JSIZE" default="16"/>
+  <arg name="PERIOD" default="0.005"/>
+
+  <!-- Adds the position control and gravity compensation -->
+  <node name="adder_gravity"
+        type="connector_node"
+        pkg="topic_connector"
+        output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="gravity_compensation_torque"/>
+    <remap from="in2" to="position_out"/>
+    <remap from="out" to="control_out"/>
+
+    <param name="connector_type" value="adder"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
+  <node name="switch_position"
+        type="connector_node"
+        pkg="topic_connector"
+        output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="manipulation_torque"/>
+    <remap from="in2" to="position_torque"/>
+    <remap from="out" to="position_out"/>
+
+    <param name="connector_type" value="switch"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
+  <!-- Envelop switch chooses between the basic and the spring envelop torques-->
+  <node name="switch_envelop"
+        type="connector_node"
+        pkg="topic_connector"
+        output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="envelop_torque"/>
+    <remap from="in2" to="spring_envelop_torque"/>
+    <remap from="out" to="envelop_out"/>
+
+    <param name="connector_type" value="switch"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
+  <!-- Sums and applies grasp and control torques -->
+  <node name="adder_control"
+    type="connector_node"
+    pkg="topic_connector"
+    output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="control_out"/>
+    <remap from="in2" to="envelop_out"/>
+    <remap from="out" to="torque_unlimited"/>
+
+    <param name="connector_type" value="adder"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
+
+  <!-- Applies limits on the final torques -->
+  <node name="limiter_final"
+    type="connector_node"
+    pkg="topic_connector"
+    respawn="true"
+    output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="torque_unlimited"/>
+    <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
+
+    <param name="limits/torque/upper" value="1.0" />
+    <param name="limits/torque/lower" value="-1.0" />
+
+    <param name="connector_type" value="limiter"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+</launch>

@@ -1,0 +1,39 @@
+<launch>
+
+  <arg name="NUM" default="0"/>
+  <arg name="HAND" default="right"/>
+
+  <!-- whether continuously maintain the last pose -->
+  <arg name="MAINTAIN" default="true" />
+
+  <!-- optional name for the initial pose -->
+  <arg name="POSE" default="" />
+
+  <!-- which rosparam namespace to read the predefined poses -->
+  <arg name="NS_POSE" default="allegro_kdl/poses" />
+
+  <arg name="TORQUE_TOPIC" default="position_torque"/>
+
+  <!-- reload gains -->
+  <rosparam file="$(find allegro_hand_kdl)/config/gains.yaml" command="load"
+    ns="allegroHand_$(arg HAND)_$(arg NUM)"/>
+
+  <!-- reload predefined poses -->
+  <rosparam command="load" file="$(find allegro_hand_kdl)/config/joint_poses.yaml" ns="$(arg NS_POSE)" />
+
+  <node name="joint_pose_server"
+        type="joint_pose_server"
+        pkg="allegro_hand_kdl"
+        output="screen">
+
+    <param name="pose_ns" value="$(arg NS_POSE)" />
+    <param name="maintain_pose" value="$(arg MAINTAIN)" />
+    <param name="initial_pose" value="$(arg POSE)" />
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="position_torque" to="$(arg TORQUE_TOPIC)"/>
+
+  </node>
+
+</launch>

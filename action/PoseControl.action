@@ -1,0 +1,8 @@
+geometry_msgs/Pose[] cartesian_pose
+float64[] joint_pose
+---
+geometry_msgs/Pose[] cartesian_pose
+float64[] joint_pose
+---
+geometry_msgs/Pose[] cartesian_pose
+float64[] joint_pose

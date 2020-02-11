@@ -1,0 +1,10 @@
+# These are the general parameters used for allegro control
+
+allegro_kdl:
+  # kdl inverse dynamics parameters are smaller than expected
+  # this scaler is used to scale them to an effective level
+  # e.g. gravity compensation uses this scaler
+  kdl_scaler: 4.0
+  # safety threshold for torques applied to joints
+  # every package uses this value to halt the system if it's exceeded
+  safety_torque: 1.6

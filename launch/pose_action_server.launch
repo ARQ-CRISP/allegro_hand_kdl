@@ -1,0 +1,31 @@
+<launch>
+
+  <arg name="NUM" default="0"/>
+  <arg name="HAND" default="right"/>
+
+  <arg name="TIME_LIMIT" default="4.0" />
+
+  <arg name="TORQUE_TOPIC" default="position_torque"/>
+
+  <!-- reload gains -->
+  <rosparam file="$(find allegro_hand_kdl)/config/gains.yaml" command="load"
+    ns="allegroHand_$(arg HAND)_$(arg NUM)"/>
+
+  <!-- TODO: use predefined poses -->
+  <!-- <arg name="NS_POSE" default="allegro_kdl/poses" /> -->
+  <!-- <rosparam command="load" file="$(find allegro_hand_kdl)/config/cartesian_poses.yaml" ns="$(arg NS_POSE)" /> -->
+
+  <node name="pose_action_server"
+        type="pose_action_server"
+        pkg="allegro_hand_kdl"
+        output="screen">
+
+    <param name="time_limit" value="$(arg TIME_LIMIT)" />
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="torque" to="$(arg TORQUE_TOPIC)"/>
+
+  </node>
+
+</launch>

@@ -1,0 +1,13 @@
+# Allegro hand paramaters
+# These are the parameters specific to a robot hand
+
+robot_hand:
+  name: "allegro"
+  # total amount of controllable joints
+  joint_count: 16
+  # how many fingers (manipulator chains)
+  finger_count: 4
+  # how many joints per finger
+  finger_length: 4
+  # root link tf name
+  root_tf_name: "hand_root"

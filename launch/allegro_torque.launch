@@ -1,0 +1,81 @@
+<launch>
+
+  <!-- Which hand (left/right) -->
+  <arg name="HAND" default="right"/>
+  <arg name="NUM" default='0'/>
+  <arg name ="RVIZ" default="true" />
+
+  <arg name ="xacro_path" default="$(find ur5_allegro_moveit)/models/allegro_optoforce_$(arg HAND).xacro"/>
+  <arg name="load_xacro" default="true"/><!-- Should the xacro be loaded? -->
+  <!-- Use the joint_state_publisher for *commanded* joint angles. -->
+  <arg name="JSP_GUI" default="false"/>
+
+  <arg name="PARAMS_DIR" default="$(find allegro_hand_parameters)" />
+
+  <!-- yaml param files for your hand can be found in parameters/zero_files/ -->
+  <arg name="ZEROS" default="$(arg PARAMS_DIR)/zero.yaml"/>
+
+  <!-- option to (not) publish tf, useful when mounting the hand -->
+  <arg name="TF" default="true" />
+
+  <!-- run in simulation mode? -->
+  <arg name="sim" default="false" />
+
+  <arg name="CONTROLLER" default="torque" unless="$(arg sim)"/>
+  <arg name="CONTROLLER" value="sim" if="$(arg sim)" />
+
+  <!-- LOAD ALLEGRO RELATED PARAMETERS -->
+  <!-- general parameters of the experiments -->
+  <rosparam command="load" file="$(find allegro_hand_kdl)/config/params.yaml" />
+  <!-- hand parameters -->
+  <rosparam command="load" file="$(find allegro_hand_kdl)/config/allegro_params.yaml" />
+  <!-- predefined poses -->
+  <rosparam command="load" file="$(find allegro_hand_kdl)/config/joint_poses.yaml" ns="allegro_kdl/poses" />
+  <!-- custom gains of allegro kdl package -->
+  <rosparam command="load" file="$(find allegro_hand_kdl)/config/gains.yaml" ns="allegroHand_$(arg HAND)_$(arg NUM)" />
+
+  <!-- Load the allegro hand launch with desired parameters -->
+  <include file="$(find allegro_hand)/launch/allegro_hand.launch">
+    <arg name="HAND" value="$(arg HAND)"/>
+    <arg name="NUM" value="$(arg NUM)"/>
+    <arg name="CONTROLLER" value="$(arg CONTROLLER)"/>
+    <arg name="JSP_GUI" value="$(arg JSP_GUI)"/>
+    <arg name="ZEROS" value="$(arg ZEROS)"/>
+    <arg name="load_xacro" value="$(arg load_xacro)"/>
+    <arg name="XACRO_PATH"
+      value="$(arg xacro_path)"/>
+    <arg name="TF" value="$(arg TF)" />
+  </include>
+
+  <!-- fake controller is only run in simulation -->
+  <node name="fake_control"
+        type="fake_control"
+        pkg="allegro_hand_kdl"
+        output="screen"
+        if="$(arg sim)">
+
+    <param name="hand" value="$(arg HAND)" />
+    <param name="num" value="$(arg NUM)" />
+
+    <!-- topic remappings -->
+    <remap from="joint_cmd" to="allegroHand_$(arg NUM)/joint_cmd"/>
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="torque_cmd" to="allegroHand_$(arg NUM)/torque_cmd"/>
+  </node>
+
+  <!-- include envelop force with zero intensity, to control from torque panel -->
+  <include file="$(find allegro_hand_kdl)/launch/envelop_force.launch">
+    <arg name="LABEL" value="panel" />
+    <arg name="NUM" value="$(arg NUM)"/>
+    <arg name="INTENSITY" value="0.0" />
+  </include>
+
+  <!-- move in config file -->
+  <node name="rviz_$(arg NUM)"
+        pkg="rviz" type="rviz"
+        if="$(arg RVIZ)"
+        args="-d $(find allegro_hand_kdl)/config/allegro_torque_config.rviz" >
+
+  </node>
+
+</launch>

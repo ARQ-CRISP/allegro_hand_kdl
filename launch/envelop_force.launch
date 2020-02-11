@@ -1,0 +1,27 @@
+<launch>
+
+  <arg name="LABEL" default="0" />
+
+  <arg name="NUM" default="0"/>
+
+  <arg name="TORQUE_TOPIC" default="envelop_torque"/>
+
+  <arg name="INTENSITY" default="1.2" />
+
+  <node name="envelop_force_$(arg LABEL)"
+        type="envelop_force"
+        pkg="allegro_hand_kdl"
+        output="screen" >
+
+    <param name="envelop_scale" type="double" value="$(arg INTENSITY)" />
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <!-- <remap from="envelop_intensity" to="envelop_intensity"/> -->
+
+    <remap from="envelop_torque" to="$(arg TORQUE_TOPIC)"/>
+
+  </node>
+
+
+</launch>

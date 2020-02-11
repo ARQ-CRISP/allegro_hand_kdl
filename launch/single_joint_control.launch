@@ -1,0 +1,18 @@
+<launch>
+
+  <arg name="NUM" default="0"/>
+  <arg name="HAND" default="right"/>
+
+  <node name="single_joint_control"
+        type="single_joint_control_test"
+        pkg="allegro_hand_kdl"
+        output="screen"
+        launch-prefix-inactive="xterm -e gdb --args" >
+
+    <!-- topic remappings -->
+    <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
+    <remap from="torque" to="position_torque"/>
+
+  </node>
+
+</launch>
