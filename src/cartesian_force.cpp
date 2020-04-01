@@ -110,6 +110,19 @@ KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vecto
 
   return t_joint;
 }
+// wrapper using semantically correct dtype: Wrench
+KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vector<KDL::Wrench>& f_cart){
+
+  vector<JntArray> u_cart(FINGER_COUNT);
+  for(int fi=0; fi < FINGER_COUNT; fi++){
+    // convert to JntArray
+    u_cart[fi].resize(6);
+    for(int i = 0; i < 6; ++i)
+      u_cart[fi].data[i] = f_cart[fi][i];
+  }
+  // call the core method
+  return computeTorques(q, u_cart);
+}
 // wrapper for std and ros types
 // f_cart shall have size 4x6 (fingers count:4, wrench: 6)
 vector<double> CartesianForce::computeTorques(const vector<double>& q, const vector< vector<double> >& f_cart){

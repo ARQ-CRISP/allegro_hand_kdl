@@ -81,7 +81,7 @@ void JointPositionController::computeTorques(const JntArray& q, const JntArray& 
   ros::Time t_now = ros::Time::now();
   double dt_update = (t_now - t_update_).sec + 1e-9 * (t_now - t_update_).nsec;
   // time init? the memory variables are outdated
-  if(dt_update > 1.0) {
+  if(dt_update > 0.1) {
     dt_update = 0.0;
     q_last_.resize(0);
     resetIntegralError_();
@@ -176,13 +176,31 @@ void JointPositionController::applyVirtualDamping_(JntArray& qd)
     qd(qi) = qd(qi) * vel_ratio;
 }
 /*********************************************************************
+* adding of single dimension of error
+* if the sign changed, the error resets
+*********************************************************************/
+double JointPositionController::addIntegralError_(const double e_total, const double e_last) {
+  // different signs?
+  if(e_total * e_last < 0)
+    // reset the error
+    return e_last;
+  else
+    // accumulate error
+    return (e_total * (1.0-decay_int_)) + e_last;
+}
+
+/*********************************************************************
 * Accumulate the integral error for future. Apply decay to past error.
 *********************************************************************/
 void JointPositionController::updateIntegralError_(const Eigen::VectorXd& err){
   // add the last error to integral error
-  unsigned int size = e_sum_vec_.rows();
-  for(unsigned int i=0; i < size; i++)
-    e_sum_vec_(i) = (e_sum_vec_(i) * (1.0-decay_int_)) + err(i);
+  for(int fi=0; fi < FINGER_COUNT; fi++){
+    // update integral error only when the finger is active
+    if(active_fingers_[fi]){
+      for(int ji=fi*FINGER_LENGTH; ji < (fi+1)*FINGER_LENGTH; ji++)
+        e_sum_vec_(ji) = addIntegralError_(e_sum_vec_(ji), err(ji));
+    }
+  }
 
 }
 /*********************************************************************
@@ -265,6 +283,11 @@ void JointPositionController::setActiveFingers(const int active_digits)
 }
 void JointPositionController::setActiveFingers(const vector<bool> activity_vec)
 { active_fingers_ = activity_vec; }
+void JointPositionController::setActiveFingers(const vector<uint8_t> activity_vec)
+{
+  for(int fi=0; fi<FINGER_COUNT; fi++)
+    active_fingers_[fi] = (bool) activity_vec[fi];
+}
 // getters
 vector<double> JointPositionController::getPositionGain()
 { vector<double> ret_vec;

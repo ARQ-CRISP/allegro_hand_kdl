@@ -205,7 +205,7 @@ int Kinematics::calcJointPos(const JntArray& q_init, const vector<KDL::Frame>& x
   for(int fi=0; fi < FINGER_COUNT; fi++){
 
       JntArray q_init_finger(FINGER_LENGTH);
-      JntArray q_des_finger;
+      JntArray q_des_finger(FINGER_LENGTH);
 
       // get finger joints
       for(int si=0; si<FINGER_LENGTH; si++) // si = segment index
@@ -258,7 +258,7 @@ void Kinematics::calcJointVel(const JntArray& q_init, const vector<KDL::Twist>& 
   for(int fi=0; fi < FINGER_COUNT; fi++){
 
       JntArray q_init_finger(FINGER_LENGTH);
-      JntArray qd_des_finger;
+      JntArray qd_des_finger(FINGER_LENGTH);
 
       // get finger joints
       for(int si=0; si<FINGER_LENGTH; si++) // si = segment index

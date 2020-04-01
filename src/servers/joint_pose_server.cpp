@@ -65,15 +65,9 @@ vector<double> q_des_;
 ros::Time t_begin_;
 ros::Time t_update_;
 
-// debug
-kdl_control_tools::ProgressLogger p_logger_;
-
 bool success_ = false;
 
-bool state_read_ = false;
 bool finished_ = true;
-
-bool debug_write_ = false;
 
 void sigintCallback(int sig);
 void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg);
@@ -114,8 +108,6 @@ int main(int argc, char **argv){
 
   // determine active fingers
   joint_control_->setActiveFingers(91111);
-  // connect logger to joint controller
-  joint_control_->connectLogger(&p_logger_);
 
   // countdown only if there is an initial pose
   if(q_des_.size()>0){
@@ -210,6 +202,7 @@ bool getParams(){
     ROS_WARN("Joint Pose Server: Can't get maintain_pose param.");
   }
   if (maintain_){
+    finished_ = false;
     ROS_INFO("Joint Pose Server: maintaining pose.");
   }
 
@@ -283,12 +276,6 @@ bool isFinished(const vector<double>& torque_vec){
   // check if stop torque is exceeded
   int t_size = torque_vec.size();
 
-  // FIXME: one joint is enough for stop
-  for(int ji=0; ji<t_size; ji++)
-    // compare to threshold
-    if(abs(torque_vec[ji])>stop_torque_)
-      return false;
-
   // time out fail check
   ros::Time t_now = ros::Time::now();
   double time_passed = (t_now - t_begin_).sec + 1e-9 * (t_now - t_begin_).nsec;
@@ -302,36 +289,19 @@ bool isFinished(const vector<double>& torque_vec){
     return true;
   }
 
+  // stop if all torques are lower than the threshold
+  for(int ji=0; ji<t_size; ji++)
+    // compare to threshold
+    if(abs(torque_vec[ji])>stop_torque_)
+      return false;
+
   return true;
 }
 
-void publishError(){
+void publishError(const vector<double>& torque_vec){
 
-    // create message
     std_msgs::Float64MultiArray msg;
-
-    msg.layout.dim.resize(2);
-    msg.layout.dim[0].label = "joint";
-    msg.layout.dim[0].size = 16;
-    msg.layout.dim[0].stride = 2*16;
-    msg.layout.dim[1].label = "type";
-    msg.layout.dim[1].size = 2;
-    msg.layout.dim[1].stride = 2;
-
-    // msg.data.resize(2*16);
-
-    for(int fi=0; fi<FINGER_LENGTH*FINGER_COUNT; fi++){
-      // get torques: analogous to errors
-      int pos_len = p_logger_.getProgressLength("t_pos_"+to_string(fi));
-      double t_pos = p_logger_.getLog("t_pos_"+to_string(fi),pos_len-1);
-      int vel_len = p_logger_.getProgressLength("t_vel_"+to_string(fi));
-      double t_vel = p_logger_.getLog("t_vel_"+to_string(fi),vel_len-1);
-
-      // add to data
-      msg.data.push_back(t_pos);
-      msg.data.push_back(t_vel);
-    }
-
+    msg.data = torque_vec;
     error_pub_.publish(msg);
 }
 
@@ -376,36 +346,25 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
 void timerCallback(const ros::TimerEvent&){
   // avoid working after finishing
-  if(finished_) return;
-
-  // *** initial state
-  if(!state_read_){
-    // if no desired state, then maintain the current state
-    if(q_des_.size() < FINGER_LENGTH*FINGER_COUNT)
-      q_des_ = q_current_;
-
-    t_update_ = ros::Time::now();
-    state_read_ = true;
-    return;
-  }
-
-  // *** control
+  if(finished_ || q_current_.size() == 0) return;
 
   // Calc time since last control
   ros::Time t_now = ros::Time::now();
   double dt_update = (t_now - t_update_).sec + 1e-9 * (t_now - t_update_).nsec;
-
+  t_update_ = ros::Time::now();
   // publish dt TODO: organize debug
   std_msgs::Float64 dt_msg;
   dt_msg.data = dt_update;
   dt_pub_.publish(dt_msg);
 
-  t_update_ = ros::Time::now();
+  // if no desired state, then maintain the current state
+  if(q_des_.size() < FINGER_LENGTH*FINGER_COUNT)
+    q_des_ = q_current_;
 
   // qd_des is the desired average velocity
   vector<double> qd_des(FINGER_COUNT*FINGER_LENGTH);
   for(int qi=0; qi<FINGER_COUNT*FINGER_LENGTH; qi++){
-    // velocity is proportional to distance
+    // velocity is proportional to distance / per second
     qd_des[qi] = q_des_[qi] - q_current_[qi];
     // imposing speed as a limit will support slowing near the end
     // Assert -v_lim < qd_des < v_lim
@@ -418,9 +377,6 @@ void timerCallback(const ros::TimerEvent&){
   joint_control_->computeTorques(q_current_, q_des_, qd_des, torques);
 
   publishTorque(torques);
-
-  // publish debug info
-  publishError();
 
   // if not maintaining, then stop when finished
   if(!maintain_ && !finished_){
@@ -438,17 +394,27 @@ bool processPoseRequest(
       allegro_hand_kdl::PoseRequest::Response& res){
 
   // read the pose, if exists
-  vector<double> pose = getDefinedPose(req.pose);
-  if(pose.size() < FINGER_COUNT*FINGER_LENGTH) return false;
+  if(req.pose.size() > 0){
+    vector<double> pose = getDefinedPose(req.pose);
+    if(pose.size() < FINGER_COUNT*FINGER_LENGTH) return false;
+    // update the desired joint states
+    q_des_ = pose;
+  }else{
+    // otherwise maintain current pose
+    q_des_.clear();
+  }
 
-  // update the desired joint states
-  q_des_ = pose;
+  // maintaining behaviour (optional)
+  if(req.behaviour.size() > 0)
+    maintain_ = (req.behaviour == "maintain");
+  // finger activation update (optional)
+  if(req.active_fingers.size() == FINGER_COUNT)
+    joint_control_->setActiveFingers(req.active_fingers);
 
   // activate controller again
   finished_ = false;
 
   // used when not maintaining the pose:
-  state_read_ = false;
   t_begin_ = ros::Time::now();
 
   // FIXME: success is meaningless right now
@@ -459,24 +425,6 @@ bool processPoseRequest(
 
 // This procedure is called when the ros node is interrupted
 void sigintCallback(int sig){
-  // save the debug trajectory
-  string filename_suffix =
-      "_"+to_string((int)(joint_control_->getPositionGain()[0]*100))+"_"+
-      to_string((int)(joint_control_->getVelocityGain()[0]*100))+".csv";
-
-  if(debug_write_){
-
-    for(int ji=0; ji < FINGER_COUNT*FINGER_LENGTH; ji++){
-      p_logger_.writeVarToFile("q_enc_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("q_des_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("t_pos_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("qd_enc_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("qd_des_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("t_vel_"+to_string(ji), filename_suffix);
-      p_logger_.writeVarToFile("e_sum_"+to_string(ji), filename_suffix);
-    }
-    p_logger_.writeVarToFile("dt", filename_suffix);
-  }
 
   stopMoving();
 

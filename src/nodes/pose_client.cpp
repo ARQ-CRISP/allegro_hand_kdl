@@ -53,9 +53,9 @@ int main(int argc, char **argv)
 
   // create the clients
   cartesian_client =
-    make_shared<CartesianPoseClient>(nh);
+    make_shared<CartesianPoseClient>();
   joint_client =
-    make_shared<JointPoseClient>(nh);
+    make_shared<JointPoseClient>();
 
   // TODO: listen to topics for continuous pose requests
 

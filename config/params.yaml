@@ -7,4 +7,4 @@ allegro_kdl:
   kdl_scaler: 4.0
   # safety threshold for torques applied to joints
   # every package uses this value to halt the system if it's exceeded
-  safety_torque: 1.6
+  safety_torque: 3.0

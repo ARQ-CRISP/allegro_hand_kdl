@@ -26,8 +26,8 @@
         output="screen" >
 
     <!-- topic remappings -->
-    <remap from="in1" to="manipulation_torque"/>
-    <remap from="in2" to="position_torque"/>
+    <remap from="in1" to="position_torque"/>
+    <remap from="in2" to="manipulation_torque"/>
     <remap from="out" to="position_out"/>
 
     <param name="connector_type" value="switch"/>

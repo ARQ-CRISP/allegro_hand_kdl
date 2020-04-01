@@ -67,12 +67,12 @@ class Kinematics
 
   public:
   	Kinematics(AllegroKdlConfig& kdl_config,
-        unsigned int maxiter = 150,
+        unsigned int maxiter = 500,
         double eps = 1e-6 );
   	Kinematics(AllegroKdlConfig& kdl_config,
         const vector<double>& q_min,
         const vector<double>& q_max,
-        unsigned int maxiter = 150,
+        unsigned int maxiter = 500,
         double eps = 1e-6 );
   	~Kinematics();
 

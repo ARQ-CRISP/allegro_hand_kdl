@@ -72,6 +72,7 @@ class JointPositionController
 
     bool activateFinger_(int finger_no, KDL::JntArray& torq_out);
     void applyVirtualDamping_(JntArray& qd);
+    double addIntegralError_(const double e_total, const double e_last);
     void updateIntegralError_(const Eigen::VectorXd& err);
     void resetIntegralError_();
     void estimateVelocity_(const double dt_update, const JntArray& q, JntArray& qd);
@@ -99,6 +100,7 @@ class JointPositionController
     void setDamping(const double damp_ratio);
     void setActiveFingers(const int active_digits);
     void setActiveFingers(const vector<bool> activity_vec);
+    void setActiveFingers(const vector<uint8_t> activity_vec);
 
     vector<double> getPositionGain();
     vector<double> getVelocityGain();

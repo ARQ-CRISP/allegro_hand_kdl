@@ -81,6 +81,7 @@ class CartesianPositionController
     ros::Time t_update_;
 
     void initParams_();
+    double addIntegralError_(const double e_total, const double e_last);
     void updateIntegralError_(const HandPose& x, const HandPose& x_des, double t);
     void estimateVelocity_(const double dt_update, const HandPose& x, HandVelocity& xd);
     bool checkKdlObjects_();
@@ -114,6 +115,7 @@ class CartesianPositionController
 
     void setActiveFingers(const int active_digits);
     void setActiveFingers(const vector<bool> activity_vec);
+    void setActiveFingers(const vector<uint8_t> activity_vec);
 
     double getPositionGain();
     double getRotationGain();

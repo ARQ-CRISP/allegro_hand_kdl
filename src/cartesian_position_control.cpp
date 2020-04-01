@@ -89,6 +89,7 @@ HandAcceleration CartesianPositionController::computeForces(const HandPose& x_de
   // compute desired acceleration using position and velocity
   HandAcceleration xdd_des(FINGER_COUNT);
   for(int fi=0; fi < FINGER_COUNT; fi++){
+    if(!active_fingers_[fi]) continue; // skip inactive fingers
 
     // current position error
     KDL::Twist x_dif = KDL::diff(x_cur_[fi], x_des[fi]);
@@ -124,8 +125,12 @@ KDL::JntArray CartesianPositionController::computeTorques(const HandPose& x_des,
   // convert to required format by cf_solver
   vector<KDL::JntArray> u_des(FINGER_COUNT);
   for(int fi=0; fi < FINGER_COUNT; fi++){
+
     // convert to JntArray
     u_des[fi].resize(6);
+    
+    if(!active_fingers_[fi]) continue; // skip inactive fingers
+
     for(int i = 0; i < 6; ++i)
       u_des[fi].data[i] = xdd_des[fi][i];
   }
@@ -202,13 +207,33 @@ bool CartesianPositionController::checkKdlObjects_() {
   return true;
 }
 /*********************************************************************
+* adding of single dimension of error
+* if the sign changed, the error resets
+*********************************************************************/
+double CartesianPositionController::addIntegralError_(const double e_total, const double e_last) {
+  // different signs?
+  if(e_total * e_last < 0)
+    // reset the error
+    return e_last;
+  else
+    // accumulate error
+    return (e_total * (1.0-decay_int_)) + e_last;
+}
+
+/*********************************************************************
 * Accumulate the integral error for future. Apply decay to past error.
 *********************************************************************/
 void CartesianPositionController::updateIntegralError_(const HandPose& x, const HandPose& x_des, double t) {
   // add the last error to integral error
   for(int fi=0; fi<FINGER_COUNT; fi++){
-    KDL::Twist err =  KDL::diff(x[fi], x_des[fi]) * t;
-    e_sum_vec_[fi] = (e_sum_vec_[fi] * (1.0-decay_int_)) + err;
+    if(!active_fingers_[fi]) continue; // skip inactive fingers
+
+    KDL::Twist err_last =  KDL::diff(x[fi], x_des[fi]) * t;
+
+    for(int di=0; di<3; di++) { // dimensions
+      e_sum_vec_[fi][di] = addIntegralError_(e_sum_vec_[fi][di], err_last.vel[di]);
+      e_sum_vec_[fi][di+3] = addIntegralError_(e_sum_vec_[fi][di+3], err_last.rot[di]);
+    }
   }
 }
 /*********************************************************************
@@ -273,6 +298,11 @@ void CartesianPositionController::setActiveFingers(const int active_digits)
 }
 void CartesianPositionController::setActiveFingers(const vector<bool> activity_vec)
 { active_fingers_ = activity_vec; }
+void CartesianPositionController::setActiveFingers(const vector<uint8_t> activity_vec)
+{
+  for(int fi=0; fi<FINGER_COUNT; fi++)
+    active_fingers_[fi] = (bool) activity_vec[fi];
+}
 // getters
 double CartesianPositionController::getPositionGain()
 { return k_p_; }

@@ -44,6 +44,8 @@ class PoseControlClient
     ros::ServiceClient srv_;
 
     string target_name_;
+    string behaviour_;
+    vector<uint8_t> active_fingers_;
 
     inline int findPose_(string ns, string name){
       // iterate existing poses (following pattern p0,p1...)
@@ -62,8 +64,9 @@ class PoseControlClient
 
   public:
 
-    inline PoseControlClient(ros::NodeHandle& nh, string srv_name){
-      nh_ = nh;
+    inline PoseControlClient(const string& srv_name, const string& behaviour=""):
+      behaviour_(behaviour) {
+      nh_ = ros::NodeHandle();
       srv_ =
         nh_.serviceClient<allegro_hand_kdl::PoseRequest>(srv_name);
     }
@@ -74,17 +77,41 @@ class PoseControlClient
 
     // existing pose
     void setTargetPose(string name){
-
       target_name_ = name;
     }
 
+    void setBehaviour(const string& behaviour){
+      behaviour_ = behaviour;
+    }
+
+    void setActiveFingers(const vector<bool>& active_fingers){
+      for(int fi=0; fi<FINGER_COUNT; fi++)
+        active_fingers_[fi] = (bool) active_fingers[fi];
+    }
+
+    void setActiveFingers(const vector<uint8_t>& active_fingers){
+      active_fingers_ = active_fingers;
+    }
+
+    void activateAllFingers(){
+      active_fingers_ = vector<uint8_t>(FINGER_COUNT, 1);
+    }
+
+    // keeps its current pose
+    inline bool maintainPose(){
+      setTargetPose("");
+      move();
+    }
+
     // just calls the server to move
-    inline void move(){
+    inline bool move(){
 
       allegro_hand_kdl::PoseRequest req;
       req.request.pose = target_name_;
+      req.request.behaviour = behaviour_;
+      req.request.active_fingers = active_fingers_;
 
-      srv_.call(req);
+      return srv_.call(req);
     }
 
 };
@@ -92,10 +119,8 @@ class PoseControlClient
 class CartesianPoseClient : public PoseControlClient<geometry_msgs::Pose>
 {
   public:
-    inline CartesianPoseClient(ros::NodeHandle& nh) :
-      PoseControlClient(nh, "desired_cartesian_pose"){}
-    inline CartesianPoseClient(ros::NodeHandle& nh, string srv_name) :
-      PoseControlClient(nh, srv_name){}
+    inline CartesianPoseClient(const string& srv_name="desired_cartesian_pose", const string& behaviour="") :
+      PoseControlClient(srv_name, behaviour){}
 
     // create new pose and (over)write on the name
     inline void setTargetPose(vector<geometry_msgs::Pose>& pose_vec, string name="tmp") override {
@@ -127,10 +152,8 @@ class CartesianPoseClient : public PoseControlClient<geometry_msgs::Pose>
 class JointPoseClient : public PoseControlClient<double>
 {
   public:
-    inline JointPoseClient(ros::NodeHandle& nh) :
-      PoseControlClient(nh, "desired_pose"){}
-    inline JointPoseClient(ros::NodeHandle& nh, string srv_name) :
-      PoseControlClient(nh, srv_name){}
+    inline JointPoseClient(const string& srv_name="desired_pose", const string& behaviour="") :
+      PoseControlClient(srv_name, behaviour){}
 
     // create new pose and (over)write on the name
     inline void setTargetPose(vector<double>& pose_vec, string name="tmp") override {

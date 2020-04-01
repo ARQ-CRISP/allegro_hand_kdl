@@ -36,6 +36,8 @@
 #include <tf2/LinearMath/Quaternion.h>
 
 #include <sensor_msgs/JointState.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <std_msgs/Float64MultiArray.h>
 
 using namespace std;
 using namespace allegro_hand_kdl;
@@ -46,6 +48,8 @@ typedef shared_ptr<HandPose> HandPosePtr;
 unique_ptr<CartesianPositionController> cp_control_;
 
 ros::Publisher torque_pub_; // to control the robot
+ros::Publisher vis_pub_; // to visualize the desired frames
+ros::Publisher err_pub_; // to publish the pose error
 
 // desired average speed
 double v_lim_vel_ = 0.03; // meters per second
@@ -55,8 +59,8 @@ double v_lim_rot_ = 0.35; // radians per second
 double period_ = 0.005;
 double safety_torque_ = 1.0;
 bool maintain_ = true;
-double stop_torque_ = 0.06;
-double time_limit_ = 4.0;
+double stop_err_ = 0.0005; // meters
+double time_limit_ = 5.0;
 string pose_param_ns_;
 
 double k_p_ = 10;
@@ -68,20 +72,24 @@ double k_i_ = 0.0;
 vector<double> q_current_;
 HandPose x_des_;
 
+vector<double> total_errors_;
+
 ros::Time t_update_;
 ros::Time t_begin_;
 
 bool success_ = false;
 
-bool state_read_ = false;
 bool finished_ = true;
 
 void sigintCallback(int sig);
+vector<KDL::Twist> publishError(const HandPose& x_cur);
+void publishTorque(const KDL::JntArray& torque_vec);
 void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg);
 void timerCallback(const ros::TimerEvent&);
 bool processPoseRequest(allegro_hand_kdl::PoseRequest::Request& req, allegro_hand_kdl::PoseRequest::Response& res);
+void displayDesiredPoses(const HandPose& x_des);
 HandVelocity limitedDesiredVelocity(const HandPose& x_cur);
-vector<KDL::Frame> getDefinedPose(string desired_name);
+HandPose getDefinedPose(string desired_name);
 bool getParams();
 
 int main(int argc, char **argv){
@@ -124,6 +132,11 @@ int main(int argc, char **argv){
     nh.advertise<sensor_msgs::JointState>("position_torque", 1);
   ros::Subscriber sub_js =
     nh.subscribe<sensor_msgs::JointState>("joint_states", 1, jointStateCallback, ros::TransportHints().tcpNoDelay().reliable());
+  // NOTE: debug
+  vis_pub_ =
+    nh.advertise<visualization_msgs::MarkerArray>("desired_pose_markers", 1);
+  err_pub_ =
+    nh.advertise<std_msgs::Float64MultiArray>("cartesian_pose_error", 1);
 
   ros::ServiceServer service =
     nh.advertiseService("desired_cartesian_pose", processPoseRequest);
@@ -131,6 +144,12 @@ int main(int argc, char **argv){
   // start the control loop
   t_begin_ = ros::Time::now();
   ros::Timer timer = nh.createTimer(ros::Duration(period_), &timerCallback);
+
+  // NOTE: debug
+  if(x_des_.size() == FINGER_COUNT)
+    displayDesiredPoses(x_des_);
+  // monitor errors [e_pos, e_rot] x fingers
+  total_errors_.resize(2*FINGER_COUNT, 0.0);
 
   ros::spin();
 
@@ -199,7 +218,7 @@ bool getParams(){
   string str_pose;
   if(ros::param::get("~initial_pose", str_pose)){
     // get the pose if exists
-    vector<KDL::Frame> pose = getDefinedPose(str_pose);
+    HandPose pose = getDefinedPose(str_pose);
     if(pose.size() == FINGER_COUNT){
       // assign the pose and activate controller
       x_des_ = pose;
@@ -213,7 +232,7 @@ bool getParams(){
 }
 
 // get pose from server whenever necessary
-vector<KDL::Frame> getDefinedPose(string desired_name){
+HandPose getDefinedPose(string desired_name){
 
   // iterate existing poses (following pattern p0,p1...) until finding the one
   int pi = 0;
@@ -253,7 +272,7 @@ vector<KDL::Frame> getDefinedPose(string desired_name){
     return pose;
   }
 
-  ROS_ERROR("Cartesian Pose Server: can't find the pose %s", desired_name.c_str());
+  ROS_WARN("Cartesian Pose Server: can't find the pose %s", desired_name.c_str());
   return vector<KDL::Frame>(); // empty pose
 }
 
@@ -280,16 +299,7 @@ void stopMoving(){
 * If maintain_pose is not checked, then the control finishes
 * when the torque drops below a threshold
 */
-bool isFinished(const JntArray& torque_vec){
-
-  // check if stop torque is exceeded
-  int t_size = torque_vec.rows();
-
-  // FIXME: one joint is enough for stop
-  for(int ji=0; ji<t_size; ji++)
-    // compare to threshold
-    if(abs(torque_vec(ji))>stop_torque_)
-      return false;
+bool isFinished(const vector<KDL::Twist>& err_vec){
 
   // time out fail check
   ros::Time t_now = ros::Time::now();
@@ -304,7 +314,37 @@ bool isFinished(const JntArray& torque_vec){
     return true;
   }
 
+  // stop when all errors are lower than the threshold
+  for(int fi=0; fi<FINGER_COUNT; fi++)
+    // compare to threshold
+    if(err_vec[fi].vel.Norm()>stop_err_)
+      return false;
+
   return true;
+}
+
+vector<KDL::Twist> publishError(const HandPose& x_cur){
+
+  std_msgs::Float64MultiArray msg_err;
+  vector<KDL::Twist> instant_errors(FINGER_COUNT);
+
+  for(int fi=0; fi<FINGER_COUNT; fi++){
+    // calculate instant and total errors
+    instant_errors[fi] = KDL::diff(x_cur[fi], x_des_[fi]);
+    total_errors_[fi*2] += instant_errors[fi].vel.Norm();
+    total_errors_[fi*2+1] += instant_errors[fi].rot.Norm();
+    // position
+    for(int di=0; di<3; di++) // add dimensions
+      msg_err.data.push_back(instant_errors[fi].vel.data[di]);
+    // orientation
+    for(int di=0; di<3; di++) // add dimensions
+      msg_err.data.push_back(instant_errors[fi].rot.data[di]);
+  }
+
+  err_pub_.publish(msg_err);
+
+  return instant_errors;
+
 }
 
 void publishTorque(const KDL::JntArray& torque_vec){
@@ -380,31 +420,14 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
 void timerCallback(const ros::TimerEvent&){
   // avoid working after finishing
-  if(finished_) return;
+  if(finished_ || q_current_.size() == 0) return;
 
   // update controller state and get the current cartesian pose
-  if(q_current_.size() == 0) return;
   HandPose x_cur = cp_control_->updatePose(q_current_);
 
-  // *** initial state
-  if(!state_read_){
-
-    // if no desired state, then maintain the current state
-    if(x_des_.size() != FINGER_COUNT)
-      x_des_ = x_cur;
-
-    t_update_ = ros::Time::now();
-    state_read_ = true;
-    return;
-  }
-
-  // *** control
-
-  // Calc time since last control
-  ros::Time t_now = ros::Time::now();
-
-  t_update_ = ros::Time::now();
-
+  // if no desired state, then maintain the current state
+  if(x_des_.size() != FINGER_COUNT)
+    x_des_ = x_cur;
   // calculate the desired velocity, limited by predefined values
   HandVelocity xd_des = limitedDesiredVelocity(x_des_);
 
@@ -413,14 +436,26 @@ void timerCallback(const ros::TimerEvent&){
   torques = cp_control_->computeTorques(x_des_, xd_des);
 
   publishTorque(torques);
+  vector<KDL::Twist> err = publishError(x_cur);
 
   // if not maintaining, then stop when finished
   if(!maintain_ && !finished_){
-    finished_ = isFinished(torques);
+    finished_ = isFinished(err);
 
     if(finished_){
       success_ = true;
       stopMoving();
+
+      // NOTE: debug
+      ros::Time t_now = ros::Time::now();
+      double time_passed = (t_now - t_begin_).sec + 1e-9 * (t_now - t_begin_).nsec;
+
+      ROS_INFO("Finished moving to the pose in %.2fs. Errors:", time_passed);
+      cout << "[ ";
+      for(int fi=0; fi<FINGER_COUNT; fi++)
+        cout << "(" << total_errors_[fi*2]/time_passed << ", " << total_errors_[fi*2+1]/time_passed << ") ";
+      cout << "]" << endl << endl;
+
     }
   }
 
@@ -431,18 +466,34 @@ bool processPoseRequest(
       allegro_hand_kdl::PoseRequest::Response& res){
 
   // read the pose (if exists)
-  vector<KDL::Frame> pose = getDefinedPose(req.pose);
-  if(pose.size() < FINGER_COUNT) return false;
+  if(req.pose.size() > 0){
+    HandPose pose = getDefinedPose(req.pose);
+    if(pose.size() < FINGER_COUNT) return false;
+    // update the desired joint states
+    x_des_ = pose;
+    displayDesiredPoses(pose);
+  }else{
+    // otherwise maintain current pose
+    x_des_.clear();
+  }
+  // display on RViz
 
-  // update the desired joint states
-  x_des_ = pose;
+  // maintaining behaviour (optional)
+  if(req.behaviour.size() > 0)
+    maintain_ = (req.behaviour == "maintain");
+  // finger activation update (optional)
+  if(req.active_fingers.size() == FINGER_COUNT)
+    cp_control_->setActiveFingers(req.active_fingers);
 
   // activate control again
   finished_ = false;
 
   // used when not maintaining the pose:
-  state_read_ = false;
   t_begin_ = ros::Time::now();
+
+  // monitor errors [e_pos, e_rot] x fingers
+  total_errors_.clear();
+  total_errors_.resize(2*FINGER_COUNT, 0.0);
 
   // FIXME: success is meaningless right now
   res.success = true;
@@ -462,4 +513,42 @@ void sigintCallback(int sig){
 
   // All the default sigint handler does is to call shutdown()
   ros::shutdown();
+}
+
+void displayDesiredPoses(const HandPose& x_des){
+
+  visualization_msgs::MarkerArray marker_arr;
+
+  for(int fi=0; fi<FINGER_COUNT; fi++){
+
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = "hand_root";
+    marker.header.stamp = ros::Time();
+    marker.ns = "fingertip_pose_targets";
+
+    marker.id = fi;
+
+    marker.type = visualization_msgs::Marker::ARROW;
+    marker.action = visualization_msgs::Marker::ADD;
+
+    marker.scale.x = 0.015;
+    marker.scale.y = 0.003;
+    marker.scale.z = 0.003;
+    marker.color.r = 0.9;
+    marker.color.g = 0.6;
+    marker.color.b = 0.5;
+    marker.color.a = 0.6;
+
+    // arrow pos and rot
+    tf::poseKDLToMsg(x_des[fi], marker.pose);
+
+    marker.lifetime = ros::Duration(time_limit_*2);
+    marker.frame_locked = true;
+
+    marker_arr.markers.push_back(marker);
+  }
+
+  vis_pub_.publish( marker_arr );
+
+
 }

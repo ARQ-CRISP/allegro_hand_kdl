@@ -1,3 +1,5 @@
-string pose
+string pose # name of the pose in the parameter server
+string behaviour # (optional) "maintain" or "free"
+bool[] active_fingers # (optional) can disable some fingers
 ---
 bool success
