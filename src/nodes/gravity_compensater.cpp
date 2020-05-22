@@ -24,6 +24,8 @@
 
 #include <kdl_conversions/kdl_msg.h>
 
+#include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/Transform.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/Pose.h>
 
@@ -42,11 +44,23 @@ InverseDynamics* dynamics_;
 
 // control params
 double kdl_scaler_;
+double frequency_ = 200; // control freq (Hz)
+
+// state
+vector<double> jointstate_;
+
+// base pose transform
+tf2_ros::Buffer tf_buffer_;
+string hand_frame_="hand_root";
+string world_frame_="world";
+geometry_msgs::Transform base_tf_;
 
 ros::Publisher pub_; // publishes torques as a JointState msg
 
 // functions
-bool getParams(ros::NodeHandle nh);
+bool getParams();
+void updateBasePose();
+void timerCallback(const ros::TimerEvent&);
 void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg);
 void baseposeCallback(const geometry_msgs::Pose::ConstPtr &msg);
 void sigintCallback(int sig);
@@ -60,22 +74,27 @@ int main(int argc, char **argv)
   ros::NodeHandle nh;
 
   // attempt to get ros parameters
-  if(!getParams(nh)) return -1;
+  if(!getParams()) return -1;
 
   // create solver
   allegro_kdl_config_.parseKdl(nh);
   dynamics_ = new allegro_hand_kdl::InverseDynamics(allegro_kdl_config_);
 
+  // init state
+  jointstate_.resize(FINGER_COUNT*FINGER_LENGTH);
+
+  // create tf listener
+  tf2_ros::TransformListener tfListener(tf_buffer_);
 
   ros::Subscriber sub_js =
       nh.subscribe<sensor_msgs::JointState>( "joint_states", 1, &jointStateCallback, ros::TransportHints().tcpNoDelay().reliable());
 
-  ros::Subscriber sub_pose =
-      nh.subscribe<geometry_msgs::Pose>( "base_pose", 1, &baseposeCallback, ros::TransportHints().tcpNoDelay().reliable());
-
   // create publishers
   pub_ =
       nh.advertise<sensor_msgs::JointState>("gravity_compensation_torque", 1);
+
+  // start timer loop
+  ros::Timer timer = nh.createTimer(ros::Duration(1/frequency_), timerCallback);
 
   // ros shutdown handler
   signal(SIGINT, sigintCallback);
@@ -89,37 +108,39 @@ int main(int argc, char **argv)
 }
 
 // get external parameters if possible
-bool getParams(ros::NodeHandle nh){
+bool getParams(){
 
   string param_name;
 
   //************
-  if(!nh.searchParam("/allegro_kdl/kdl_scaler", param_name) ){
+  if(!ros::param::get("/allegro_kdl/kdl_scaler", kdl_scaler_) ){
     ROS_ERROR("Gravity compensate: Can't find kdl_scaler param.");
     return false;
   }
-  ros::param::get(param_name, kdl_scaler_);
   ROS_DEBUG("Gravity compensate: kdl_scaler is %.3f.", kdl_scaler_);
+
+  //********* hand_frame_
+  if(!ros::param::has("~hand_frame") )
+    ros::param::get("~hand_frame", hand_frame_);
+  ROS_DEBUG( "Gravity compensate: hand base frame: %s", hand_frame_.c_str() );
+
+  //********* world_frame_
+  if(ros::param::has("~world_frame") )
+    ros::param::get("~world_frame", world_frame_);
+  ROS_DEBUG( "Gravity compensate: world base frame: %s", world_frame_.c_str() );
+
+  //********* frequency_
+  if(!ros::param::has("~hz") )
+    ros::param::get("~hz", frequency_);
+  ROS_DEBUG( "Gravity compensate: control frequency: %.2f", frequency_ );
 
   return true;
 }
 
-// read the current base frame pose and update the KDL objects
-void baseposeCallback(const geometry_msgs::Pose::ConstPtr &msg){
+// update the base pose, compute and publish the torque commands
+void timerCallback(const ros::TimerEvent&){
 
-  // update the kdl config
-  allegro_kdl_config_.rotateBase(msg->orientation);
-
-  // update the dynamics solvers
-  dynamics_->updateChains(allegro_kdl_config_);
-
-}
-
-// read the current joint states and publish the torque commands
-void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg_in) {
-
-  // update the state
-  vector<double> joint_pos_vec = msg_in->position;
+  updateBasePose();
 
   // Create a JointState msg for torques
   sensor_msgs::JointState msg_out;
@@ -132,7 +153,7 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg_in) {
   vector<double> q_zeros(FINGER_COUNT*FINGER_LENGTH);
 
   dynamics_->computeTorques(
-      joint_pos_vec, q_zeros, q_zeros, msg_out.effort);
+      jointstate_, q_zeros, q_zeros, msg_out.effort);
 
   for (int j=0; j < FINGER_COUNT*FINGER_LENGTH; j++){
     // scale with constant
@@ -144,7 +165,40 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg_in) {
 
   // send!
   pub_.publish(msg_out);
+}
 
+// read the current joint states
+void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg_in) {
+
+  jointstate_ = msg_in->position;
+}
+
+void obtainHandTransform(){
+
+  try{
+    // transform of hand root w.r.t. robot base
+    base_tf_ = tf_buffer_.lookupTransform(
+      world_frame_,
+      hand_frame_,
+      ros::Time(0)).transform;
+  }
+  catch (tf2::TransformException &ex) {
+    ROS_WARN("%s",ex.what());
+    ros::Duration(1.0).sleep();
+    return;
+  }
+}
+
+// read the current base frame pose and update the KDL objects
+void updateBasePose(){
+
+  obtainHandTransform();
+
+  // update the kdl config
+  allegro_kdl_config_.rotateBase(base_tf_.rotation);
+
+  // update the dynamics solvers
+  dynamics_->updateChains(allegro_kdl_config_);
 }
 
 // This procedure is called when the ros node is interrupted

@@ -46,7 +46,7 @@ string robot_base_;
 string hand_base_;
 
 // functions
-bool getParams(ros::NodeHandle nh);
+bool getParams();
 void timerCallback(const ros::TimerEvent&);
 
 int main(int argc, char **argv){
@@ -57,7 +57,7 @@ int main(int argc, char **argv){
   ros::NodeHandle nh;
 
   // attempt to get ros parameters
-  if(!getParams(nh)) return -1;
+  if(!getParams()) return -1;
 
   // create tf listener
   tf2_ros::TransformListener tfListener(tfBuffer);
@@ -69,6 +69,8 @@ int main(int argc, char **argv){
   // start timer loop
   ros::Timer timer = nh.createTimer(ros::Duration(1/freq_pub_), timerCallback);
 
+  ROS_WARN("OBSOLETE: Base pose publisher is not needed by gravity compensation anymore.");
+
   ros::spin();
 
   return 0;
@@ -76,7 +78,7 @@ int main(int argc, char **argv){
 }
 
 // get external parameters if possible
-bool getParams(ros::NodeHandle nh){
+bool getParams(){
 
   string param_name;
   //*********

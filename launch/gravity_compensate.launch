@@ -6,6 +6,10 @@
 
   <arg name="TORQUE_TOPIC" default="gravity_compensation_torque"/>
 
+  <arg name="WRIST_FRAME" default="hand_root"/>
+  <arg name="WORLD_FRAME" default="world"/>
+
+  <arg name="HZ" default="200" />
   <node name="gravity_compensate_$(arg LABEL)"
         type="gravity_compensate"
         pkg="allegro_hand_kdl"
@@ -13,8 +17,11 @@
 
     <!-- topic remappings -->
     <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
-    <remap from="base_pose" to="allegroHand_$(arg NUM)/base_pose"/>
     <remap from="gravity_compensation_torque" to="$(arg TORQUE_TOPIC)"/>
+
+    <param name="base_frame" value="$(arg WRIST_FRAME)"/>
+    <param name="world_frame" value="$(arg WORLD_FRAME)"/>
+    <param name="hz" value="$(arg HZ)"/>
 
   </node>
 
