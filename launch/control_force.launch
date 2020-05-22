@@ -4,6 +4,9 @@
 
   <arg name="NUM" default="0"/>
 
+  <!-- control frequency -->
+  <arg name="HZ" default="200"/>
+
   <arg name="INPUT_TOPIC" default="cartesian_forces" />
   <arg name="TORQUE_TOPIC" default="allegro_torque"/>
 
@@ -12,7 +15,8 @@
         pkg="allegro_hand_kdl"
         output="screen">
 
-    <!-- topic remappings -->
+    <param name="hz" value="$(arg HZ)"/>
+
     <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>
     <remap from="cartesian_forces" to="$(arg INPUT_TOPIC)"/>
     <remap from="allegro_torque" to="$(arg TORQUE_TOPIC)"/>

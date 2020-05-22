@@ -3,6 +3,9 @@
   <arg name="NUM" default="0"/>
   <arg name="HAND" default="right"/>
 
+  <!-- control frequency -->
+  <arg name="HZ" default="200"/>
+
   <arg name="MAINTAIN" default="true" />
 
   <!-- optional name for the initial pose -->
@@ -28,6 +31,7 @@
         output="screen"
         launch-prefix-no="xterm -e gdb --args" >
 
+    <param name="hz" value="$(arg HZ)"/>
     <param name="pose_ns" value="$(arg NS_POSE)" />
     <param name="maintain_pose" value="$(arg MAINTAIN)" />
     <param name="initial_pose" value="$(arg POSE)" />

@@ -79,8 +79,8 @@
     <remap from="in1" to="torque_unlimited"/>
     <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
 
-    <param name="limits/torque/upper" value="1.0" />
-    <param name="limits/torque/lower" value="-1.0" />
+    <param name="limits/torque/upper" value="2.5" />
+    <param name="limits/torque/lower" value="-2.5" />
 
     <param name="connector_type" value="limiter"/>
     <param name="joint_count" value="$(arg JSIZE)"/>

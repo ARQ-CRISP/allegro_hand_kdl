@@ -65,7 +65,7 @@ class CartesianPositionController
     JntArray q_cur_;
     HandPose x_cur_;
     HandPose x_last_;
-    vector<KDL::Twist > vel_past_;
+    HandVelocity vel_past_;
 
     // control gain params
     // position

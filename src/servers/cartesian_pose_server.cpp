@@ -56,7 +56,7 @@ double v_lim_vel_ = 0.03; // meters per second
 double v_lim_rot_ = 0.35; // radians per second
 
 // params
-double period_ = 0.005;
+double update_freq_ = 200;
 double safety_torque_ = 1.0;
 bool maintain_ = true;
 double stop_err_ = 0.0005; // meters
@@ -143,7 +143,7 @@ int main(int argc, char **argv){
 
   // start the control loop
   t_begin_ = ros::Time::now();
-  ros::Timer timer = nh.createTimer(ros::Duration(period_), &timerCallback);
+  ros::Timer timer = nh.createTimer(ros::Duration(1.0/update_freq_), &timerCallback);
 
   // NOTE: debug
   if(x_des_.size() == FINGER_COUNT)
@@ -227,6 +227,10 @@ bool getParams(){
       ROS_INFO("Cartesian Pose Server: Initial pose is %s.", str_pose.c_str());
     }
   }
+
+  // optional frequency parameter
+  if(ros::param::has("~hz"))
+    ros::param::get("~hz", update_freq_);
 
   return true;
 }

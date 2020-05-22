@@ -51,7 +51,7 @@ ros::Publisher dt_pub_; // for debugging
 double v_lim_ = 0.3;
 
 // params
-double period_ = 0.005;
+double update_freq_ = 200;
 double safety_torque_ = 1.0;
 bool maintain_ = true;
 double stop_torque_ = 0.05;
@@ -140,7 +140,7 @@ int main(int argc, char **argv){
 
   // start the control loop
   t_begin_ = ros::Time::now();
-  ros::Timer timer = nh.createTimer(ros::Duration(period_), &timerCallback);
+  ros::Timer timer = nh.createTimer(ros::Duration(1.0/update_freq_), &timerCallback);
 
   ros::spin();
 
@@ -220,6 +220,9 @@ bool getParams(){
     }
   }
 
+  // optional frequency parameter
+  if(ros::param::has("~hz"))
+    ros::param::get("~hz", update_freq_);
 
   return true;
 
