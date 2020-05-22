@@ -22,6 +22,8 @@
 #ifndef KINEMATICS_H
 #define KINEMATICS_H
 
+#include <random>
+
 #include <ros/ros.h>
 
 #include <geometry_msgs/Pose.h>
@@ -62,22 +64,31 @@ class Kinematics
     vector<ChainIkSolverVel_pinv*> finger_ik_vel_;
     vector<ChainIkSolverPos*> finger_ik_pos_;
 
-    void createFingerSolvers_(AllegroKdlConfig& kdl_config, const vector<double>& q_min, const vector<double>& q_max, unsigned int maxiter, double eps);
+    int perturbed_trials_;
+    bool warned_perturbed_trials_;
 
+    void createFingerSolvers_(AllegroKdlConfig& kdl_config, const vector<double>& q_min, const vector<double>& q_max, unsigned int maxiter, double eps);
+    KDL::JntArray perturbJointAngles_(const KDL::JntArray& q, double scale=0.05);
+    int attemptIK_(int finger_index, const JntArray& q_init,
+                const KDL::Frame& x_des, JntArray& q_des, int trial=0);
+
+    std::default_random_engine rand_;
 
   public:
-  	Kinematics(AllegroKdlConfig& kdl_config,
-        unsigned int maxiter = 500,
-        double eps = 1e-6 );
-  	Kinematics(AllegroKdlConfig& kdl_config,
-        const vector<double>& q_min,
-        const vector<double>& q_max,
-        unsigned int maxiter = 500,
-        double eps = 1e-6 );
+    /**
+      * If perturbed_trials is greater than zero, solving attempts are repeated
+      * with perturbed initial states when the solution is inferior.
+      * This would increase the solving time, but may obtain better results.
+    **/
+    Kinematics(AllegroKdlConfig& kdl_config, int perturbed_trials=0,
+        unsigned int maxiter = 300, double eps = 1e-5);
+    // TODO: remove joint limited IK (ChainIkSolverPos_NR_JL), as it does not work well
+    Kinematics(AllegroKdlConfig& kdl_config,
+        const vector<double>& q_min, const vector<double>& q_max,
+        int perturbed_trials=0, unsigned int maxiter = 300,
+        double eps = 1e-5);
   	~Kinematics();
-
-    // void setJointLimits(const vector<double>& q_min, const vector<double>& q_max);
-
+    
     void toJointSpace(const vector<double>& q_init, const vector<geometry_msgs::Pose>& x_des, const vector<geometry_msgs::Twist>& xd_des,
           vector<double>& q_des, vector<double>& qd_des);
     void toJointSpace(const JntArray& q_init, const vector<KDL::Frame>& x_des, const vector<KDL::Twist>& xd_des,

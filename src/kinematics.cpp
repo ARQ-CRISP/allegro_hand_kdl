@@ -31,7 +31,8 @@ using namespace allegro_hand_kdl;
 *********************************************************************/
 Kinematics::Kinematics(AllegroKdlConfig& kdl_config,
     const vector<double>& q_min, const vector<double>& q_max,
-    unsigned int maxiter, double eps)
+    int perturbed_trials, unsigned int maxiter, double eps)
+    : perturbed_trials_(perturbed_trials), warned_perturbed_trials_(false)
 {
   if(!kdl_config.isReady()){
     ROS_ERROR("Kinematics: null kdl config");
@@ -41,8 +42,9 @@ Kinematics::Kinematics(AllegroKdlConfig& kdl_config,
 
   createFingerSolvers_(kdl_config, q_min, q_max, maxiter, eps);
 }
-Kinematics::Kinematics(AllegroKdlConfig& kdl_config,
+Kinematics::Kinematics(AllegroKdlConfig& kdl_config, int perturbed_trials,
     unsigned int maxiter, double eps)
+    : perturbed_trials_(perturbed_trials), warned_perturbed_trials_(false)
 {
   if(!kdl_config.isReady()){
     ROS_ERROR("Kinematics: null kdl config");
@@ -122,29 +124,47 @@ void Kinematics::createFingerSolvers_(AllegroKdlConfig& kdl_config,
 
   }
 }
-
 /*********************************************************************
-* Joint limits for ik position solvers ChainIkSolverPos_NR_JL
+* Returns slightly perturbed joint angles; using random perturbation
+* limited by the scale param
 *********************************************************************/
-// void Kinematics::setJointLimits(const vector<double>& q_min, const vector<double>& q_max)
-// {
-//   // Set joint limits for each finger
-//   for(int fi=0; fi < FINGER_COUNT; fi++){
-//
-//     // Create KDL data types
-//     JntArray qmin_kdl(FINGER_LENGTH);
-//     JntArray qmax_kdl(FINGER_LENGTH);
-//
-//     // Copy inputs from arguments
-//     for(int si=0; si<FINGER_LENGTH; si++){ // si = segment index
-//       qmin_kdl(si) = q_min[fi * FINGER_LENGTH + si];
-//       qmax_kdl(si) = q_max[fi * FINGER_LENGTH + si];
-//     }
-//
-//     finger_ik_pos_[fi]->setJointLimits(qmin_kdl, qmax_kdl);
-//
-//   }
-// }
+KDL::JntArray Kinematics::perturbJointAngles_(const KDL::JntArray& q, double scale){
+  // create the random distribution
+  std::uniform_real_distribution<double> perturb(-scale/2,scale/2);
+
+  // create the output array
+  int joint_count = q.rows();
+  JntArray q_out(q.rows());
+
+  for(int j=0; j < joint_count; j++)
+    q_out(j) = q(j) + perturb(rand_);
+
+  return q_out;
+}
+/*********************************************************************
+* Recursively solve IK until a good solution is obtained or the trial limit reached
+*********************************************************************/
+int Kinematics::attemptIK_(int finger_index, const JntArray& q_init, const KDL::Frame& x_des, JntArray& q_des, int trial){
+
+  int err = finger_ik_pos_[finger_index]->CartToJnt(q_init, x_des, q_des);
+  if(err<0)
+    ROS_DEBUG_STREAM("Kinematics: f"<<finger_index<<" "<<finger_ik_pos_[finger_index]->strError(err));
+
+  // if error: re attempt with perturbed q_init (ignoring err <= -100)
+  // this can be deactivated with perturbed_trials=0
+  if(err < 0 and err > -100 and trial<perturbed_trials_){
+    // warn if not done before
+    if(!warned_perturbed_trials_){
+      ROS_WARN("Kinematics: Re attempting IK with perturbed state. This warning is given once.");
+      warned_perturbed_trials_ = true;
+    }
+
+    JntArray q_init_pert = perturbJointAngles_(q_init);
+    return attemptIK_(finger_index, q_init_pert, x_des, q_des, ++trial);
+  }
+
+  return err;
+}
 /*********************************************************************
 * Convert both cart position and velocity (x, xd)
 * to joint position and velocity(q, qd).
@@ -180,7 +200,7 @@ void Kinematics::toJointSpace(const vector<double>& q_init, const vector<geometr
 
     // Get the inverse kinematics transformations
     finger_ik_vel_[fi]->CartToJnt(q_init_kdl, xd_des_kdl, qd_des_kdl);
-    finger_ik_pos_[fi]->CartToJnt(q_init_kdl, x_des_kdl, q_des_kdl);
+    attemptIK_(fi, q_init_kdl, x_des_kdl, q_des_kdl);
 
     // Add outputs to std vectors
     for(int si=0; si<FINGER_LENGTH; si++){ // si = segment index
@@ -197,7 +217,7 @@ void Kinematics::toJointSpace(const vector<double>& q_init, const vector<geometr
 int Kinematics::calcJointPos(const JntArray& q_init, const vector<KDL::Frame>& x_des, JntArray& q_des)
 {
 
-  int err; // error no, 0 = no error
+  int err_return = 0; // error no, 0 = no error
 
   q_des.resize(FINGER_LENGTH*FINGER_COUNT);
 
@@ -211,16 +231,17 @@ int Kinematics::calcJointPos(const JntArray& q_init, const vector<KDL::Frame>& x
       for(int si=0; si<FINGER_LENGTH; si++) // si = segment index
         q_init_finger(si) = q_init(fi * FINGER_LENGTH + si);
 
-
       // Get the inverse kinematics transformation
-      err = finger_ik_pos_[fi]->CartToJnt(q_init_finger, x_des[fi], q_des_finger);
+      int err = attemptIK_(fi, q_init_finger, x_des[fi], q_des_finger);
 
       // add to return array
       for(int si=0; si<FINGER_LENGTH; si++) // si = segment index
         q_des(fi * FINGER_LENGTH + si) = q_des_finger(si);
+
+      err_return = min(err, err_return); // report the lowest error
   }
 
-  return err;
+  return err_return;
 }
 int Kinematics::calcJointPos(const vector<double>& q_init, const vector<geometry_msgs::Pose>& x_des, vector<double>& q_des)
 {

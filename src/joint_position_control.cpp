@@ -76,12 +76,12 @@ void JointPositionController::computeTorques(const JntArray& q, const JntArray& 
   JntArray qd_des_damped(qd_des);
   if(damp_ratio_ != 0.0) applyVirtualDamping_(qd_des_damped);
 
-
   // Calc time since last control
   ros::Time t_now = ros::Time::now();
   double dt_update = (t_now - t_update_).sec + 1e-9 * (t_now - t_update_).nsec;
-  // time init? the memory variables are outdated
-  if(dt_update > 0.1) {
+  // time init? too long delay? the memory variables are outdated
+  if(dt_update > 0.5) {
+    ROS_INFO("JointPositionController: Re-initiated control state.");
     dt_update = 0.0;
     q_last_.resize(0);
     resetIntegralError_();
@@ -219,6 +219,14 @@ void JointPositionController::estimateVelocity_(const double dt_update, const Jn
   if(q_last_.rows() != q.rows()){
     // zero velocity array
     qd = JntArray(q.rows());
+
+  // if no time passed yet
+  }else if(dt_update <= 0.0){
+    ROS_WARN("JointPositionController: delta time is 0, multiple calls at the same moment!");
+    qd.data = vel_past_;
+    return;
+
+  // otherwise, the normal case
   }else{
     // p_logger_->log("dt", dt_update);
     // differentiate q

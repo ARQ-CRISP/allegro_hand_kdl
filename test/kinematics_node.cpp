@@ -20,25 +20,31 @@ tf2_ros::Buffer tfBuffer;
 ros::Publisher fk_pos_error_publisher;
 ros::Publisher ik_pos_error_publisher;
 
-vector<double> q_last_;
+vector<double> q_init_;
+vector<double> q_current_;
 
 std_msgs::Float32 ik_pos_error_;
 std_msgs::Float32 fk_pos_error_;
 
 
-void getFingertipTransforms(vector<geometry_msgs::Transform>& transforms){
+void getFingertipTransforms(vector<geometry_msgs::Pose>& poses){
+  poses.resize(FINGER_COUNT);
   // get the tf transforms of fingers and the thumb
-  transforms.clear();
   try{
     // transforms of finger tips w.r.t. hand root
     for (int fi=0; fi<FINGER_COUNT; fi++){
       int tip_index = fi * FINGER_LENGTH + 3;
-      transforms.push_back(
+      // get transform from TF server
+      geometry_msgs::Transform transform =
         tfBuffer.lookupTransform(
           "hand_root",
           "link_"+ to_string(tip_index) +"_tip",
-          ros::Time(0)).transform
-      );
+          ros::Time(0)).transform;
+      // convert to pose
+      poses[fi].orientation = transform.rotation;
+      poses[fi].position.x = transform.translation.x;
+      poses[fi].position.y = transform.translation.y;
+      poses[fi].position.z = transform.translation.z;
     }
   }
   catch (tf2::TransformException &ex) {
@@ -50,17 +56,21 @@ void getFingertipTransforms(vector<geometry_msgs::Transform>& transforms){
 
 void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
-  ROS_INFO("Kinematics jointStateCallback");
-
   // update the state
-  vector<double> joint_pos_vec = msg->position;
+  q_current_ = msg->position;
 
-  // init memory state
-  if(q_last_.size()< joint_pos_vec.size())
-    q_last_ = joint_pos_vec;
+}
+
+void timerCallback(const ros::TimerEvent&){
+  // got the joint states?
+  if(q_current_.size() < FINGER_LENGTH*FINGER_COUNT) return;
+
+  // init state as a seed for IK solver, this one is read once and kept the same
+  if(q_init_.size()< q_current_.size())
+    q_init_ = q_current_;
 
   // get tf info
-  vector<geometry_msgs::Transform> fingertip_tf_vec;
+  vector<geometry_msgs::Pose> fingertip_tf_vec;
   getFingertipTransforms(fingertip_tf_vec);
 
   if(fingertip_tf_vec.size() < FINGER_COUNT){
@@ -70,16 +80,15 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
   // test forward kinematics
   vector<geometry_msgs::Pose> fk_result;
-  kinematics_solver->calcCartPos(joint_pos_vec, fk_result);
+  kinematics_solver->calcCartPos(q_current_, fk_result);
 
     // find error
-  std_msgs::Float32 fk_pos_error_;
   fk_pos_error_.data = 0.0;
-  for(int fi; fi < FINGER_COUNT; fi++){
+  for(int fi=0; fi < FINGER_COUNT; fi++){
     fk_pos_error_.data +=
-      abs(fk_result[fi].position.x-fingertip_tf_vec[fi].translation.x)+
-      abs(fk_result[fi].position.y-fingertip_tf_vec[fi].translation.y)+
-      abs(fk_result[fi].position.z-fingertip_tf_vec[fi].translation.z);
+      abs(fk_result[fi].position.x-fingertip_tf_vec[fi].position.x)+
+      abs(fk_result[fi].position.y-fingertip_tf_vec[fi].position.y)+
+      abs(fk_result[fi].position.z-fingertip_tf_vec[fi].position.z);
   }
 
   ROS_INFO("Kinematics: FK pos error: %f", fk_pos_error_.data);
@@ -89,15 +98,16 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
   vector<double> ik_pos_result;
   int err_code;
-  err_code = kinematics_solver->calcJointPos(q_last_, fingertip_tf_vec, ik_pos_result);
+  err_code = kinematics_solver->calcJointPos(q_init_, fingertip_tf_vec, ik_pos_result);
 
+  ROS_INFO("Kinematics: IK calculated");
   if(err_code != 0)
     ROS_WARN("Kinematics: error code %d.", err_code);
 
     // find error
   ik_pos_error_.data = 0.0;
-  for(int ji; ji < FINGER_COUNT*FINGER_LENGTH; ji++){
-    ik_pos_error_.data += abs(joint_pos_vec[ji]-ik_pos_result[ji]);
+  for(int ji=0; ji < FINGER_COUNT*FINGER_LENGTH; ji++){
+    ik_pos_error_.data += abs(q_current_[ji]-ik_pos_result[ji]);
   }
 
   ROS_INFO("Kinematics: IK pos error: %f", ik_pos_error_.data);
@@ -105,11 +115,7 @@ void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
 
   // // test inverse kinematics velocity
   // vector<double> ik_vel_result;
-  // kinematics_solver->calcJointVel(joint_pos_vec, fingertip_twist_vec, ik_vel_result);
-
-
-  // update state memory
-  q_last_ = joint_pos_vec;
+  // kinematics_solver->calcJointVel(q_current_, fingertip_twist_vec, ik_vel_result);
 }
 
 bool getJointLimits(ros::NodeHandle& nh, vector<double>& qmin, vector<double>& qmax){
@@ -153,9 +159,10 @@ int main(int argc, char **argv)
 
   // create solver
   allegro_kdl_config.parseKdl(nh);
-  kinematics_solver = new Kinematics(allegro_kdl_config, qmin, qmax);
+  kinematics_solver = new Kinematics(allegro_kdl_config, 3);//, qmin, qmax);
 
   ros::Subscriber sub = nh.subscribe<sensor_msgs::JointState>("joint_states", 3, jointStateCallback);
+
 
   // create tf listener
   tf2_ros::TransformListener tfListener(tfBuffer);
@@ -165,6 +172,9 @@ int main(int argc, char **argv)
     nh.advertise<std_msgs::Float32>("fk_pos_error", 1);
   ik_pos_error_publisher =
     nh.advertise<std_msgs::Float32>("ik_pos_error", 1);
+
+  // start the test loop
+  ros::Timer timer = nh.createTimer(ros::Duration(2.0), &timerCallback); // test every 1 second
 
   ros::spin();
 

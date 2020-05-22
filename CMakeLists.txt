@@ -154,7 +154,23 @@ add_executable(pose_action_server
   src/cartesian_force.cpp
 )
 
+add_executable(fake_control
+  src/nodes/fake_control.cpp
+)
+
+add_executable(pose_client
+  src/nodes/pose_client.cpp
+  src/allegro_kdl_config.cpp
+)
+
 ## Test execulables
+add_executable(kinematics_test
+  test/kinematics_node.cpp
+  src/allegro_kdl_config.cpp
+  src/kinematics.cpp
+  src/inverse_dynamics.cpp
+)
+
 add_executable(inverse_dynamics_test
   test/inverse_dynamics_node.cpp
   src/inverse_dynamics.cpp
@@ -165,15 +181,6 @@ add_executable(single_joint_control_test
   test/single_joint_control_node.cpp
   src/allegro_kdl_config.cpp
   src/inverse_dynamics.cpp
-)
-
-add_executable(fake_control
-  src/nodes/fake_control.cpp
-)
-
-add_executable(pose_client
-  src/nodes/pose_client.cpp
-  src/allegro_kdl_config.cpp
 )
 
 # set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
@@ -231,6 +238,22 @@ target_link_libraries(joint_pose_server
   ${orocos_kdl_LIBRARIES}
 )
 
+target_link_libraries(fake_control
+  ${catkin_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+  ${orocos_kdl_LIBRARIES}
+)
+
+target_link_libraries(pose_client
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(kinematics_test
+  ${catkin_LIBRARIES}
+  ${EIGEN3_LIBRARIES}
+  ${orocos_kdl_LIBRARIES}
+)
+
 target_link_libraries(inverse_dynamics_test
   ${catkin_LIBRARIES}
   ${EIGEN3_LIBRARIES}
@@ -242,17 +265,6 @@ target_link_libraries(single_joint_control_test
   ${EIGEN3_LIBRARIES}
   ${orocos_kdl_LIBRARIES}
 )
-
-target_link_libraries(fake_control
-  ${catkin_LIBRARIES}
-  ${EIGEN3_LIBRARIES}
-  ${orocos_kdl_LIBRARIES}
-)
-
-target_link_libraries(pose_client
-  ${catkin_LIBRARIES}
-)
-
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
