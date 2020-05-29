@@ -222,7 +222,7 @@ void JointPositionController::estimateVelocity_(const double dt_update, const Jn
 
   // if no time passed yet
   }else if(dt_update <= 0.0){
-    ROS_WARN("JointPositionController: delta time is 0, multiple calls at the same moment!");
+    ROS_DEBUG("JointPositionController: delta time is 0, multiple calls at the same moment!");
     qd.data = vel_past_;
     return;
 

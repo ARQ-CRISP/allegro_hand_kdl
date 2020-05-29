@@ -249,7 +249,7 @@ void CartesianPositionController::estimateVelocity_(const double dt_update, cons
 
     // if no time passed yet
     }else if(dt_update <= 0.0){
-      ROS_WARN("Cartesian position control: delta time is 0, multiple calls at the same moment!");
+      ROS_DEBUG("Cartesian position control: delta time is 0, multiple calls at the same moment!");
       xd = vel_past_;
       return;
 
