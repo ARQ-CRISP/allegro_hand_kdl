@@ -20,18 +20,15 @@
 
 #include "allegro_hand_kdl/cartesian_force.h"
 
-
-using namespace std;
-using namespace KDL;
-
 namespace allegro_hand_kdl
 {
 /*********************************************************************
 * Creates solvers for each finger
 *********************************************************************/
-CartesianForce::CartesianForce(AllegroKdlConfig& kdl_config){
-
-  if(!kdl_config.isReady()){
+CartesianForce::CartesianForce(AllegroKdlConfig& kdl_config)
+{
+  if (!kdl_config.isReady())
+  {
     ROS_ERROR("CartesianForce: null kdl config");
     ros::shutdown();
     return;
@@ -39,9 +36,10 @@ CartesianForce::CartesianForce(AllegroKdlConfig& kdl_config){
 
   createFingerSolvers_(kdl_config);
 }
-CartesianForce::~CartesianForce(){
-
-  for (ChainJntToJacSolver* obj : finger_solver_vec_){
+CartesianForce::~CartesianForce()
+{
+  for (ChainJntToJacSolver* obj : finger_solver_vec_)
+  {
     delete obj;
   }
   finger_solver_vec_.clear();
@@ -52,10 +50,9 @@ CartesianForce::~CartesianForce(){
 *********************************************************************/
 void CartesianForce::createFingerSolvers_(AllegroKdlConfig& kdl_config)
 {
-
   // Create inverse dynamics solvers for each finger
-  for(int fi=0; fi < FINGER_COUNT; fi++){
-
+  for (int fi=0; fi < FINGER_COUNT; fi++)
+  {
     // Extract the finger chain from whole hand tree
     Chain *finger_chain = kdl_config.getFingerChain(fi);
 
@@ -64,18 +61,18 @@ void CartesianForce::createFingerSolvers_(AllegroKdlConfig& kdl_config)
 
     // Fill vectors
     finger_solver_vec_.push_back(solver);
-
   }
 }
 
 /*********************************************************************
 * Calculates the joint torques which achieve the desired cartesian forces.
 *********************************************************************/
-KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vector<KDL::JntArray>& w_vec){
-
+KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vector<KDL::JntArray>& w_vec)
+{
   // make sure that vector sizes are correct
   unsigned int jnt_count = FINGER_COUNT * FINGER_LENGTH;
-  if(w_vec.size() != FINGER_COUNT || w_vec[0].rows() != 6 || q.rows() != jnt_count){
+  if (w_vec.size() != FINGER_COUNT || w_vec[0].rows() != 6 || q.rows() != jnt_count)
+  {
     ROS_ERROR("CartesianForce: input lengths are wrong.");
     return KDL::JntArray();
   }
@@ -84,8 +81,8 @@ KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vecto
   KDL::JntArray t_joint;
 
   // Repeat for each finger
-  for(int fi=0; fi < FINGER_COUNT; fi++){
-
+  for (int fi=0; fi < FINGER_COUNT; fi++)
+  {
     // Create KDL data types
     KDL::Jacobian jac(FINGER_LENGTH);
 
@@ -94,9 +91,9 @@ KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vecto
     q_fi.data = q.data.segment(fi*FINGER_LENGTH, FINGER_LENGTH);
 
     // Get the jacobian for desired configuration
-    int error = finger_solver_vec_[fi]->JntToJac(q_fi, jac); // 4 is the index of tip segment in finger chain
-    if(error == -100)
-      ROS_ERROR("Cartesian force: failed to derive Jacobian, finger %d.",fi);
+    int error = finger_solver_vec_[fi]->JntToJac(q_fi, jac);
+    if (error == -100)
+      ROS_ERROR("Cartesian force: failed to derive Jacobian, finger %d.", fi);
 
     // Calculate the torque using jacobian
     Eigen::VectorXd t_finger = jac.data.transpose() * w_vec[fi].data;
@@ -105,19 +102,19 @@ KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vecto
     Eigen::VectorXd t_tmp(t_joint.data.rows()+ t_finger.rows());
     t_tmp << t_joint.data , t_finger;
     t_joint.data = t_tmp;
-
   }
 
   return t_joint;
 }
 // wrapper using semantically correct dtype: Wrench
-KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vector<KDL::Wrench>& f_cart){
-
+KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vector<KDL::Wrench>& f_cart)
+{
   vector<JntArray> u_cart(FINGER_COUNT);
-  for(int fi=0; fi < FINGER_COUNT; fi++){
+  for (int fi=0; fi < FINGER_COUNT; fi++)
+  {
     // convert to JntArray
     u_cart[fi].resize(6);
-    for(int i = 0; i < 6; ++i)
+    for (int i = 0; i < 6; ++i)
       u_cart[fi].data[i] = f_cart[fi][i];
   }
   // call the core method
@@ -125,8 +122,8 @@ KDL::JntArray CartesianForce::computeTorques(const KDL::JntArray& q, const vecto
 }
 // wrapper for std and ros types
 // f_cart shall have size 4x6 (fingers count:4, wrench: 6)
-vector<double> CartesianForce::computeTorques(const vector<double>& q, const vector< vector<double> >& f_cart){
-
+vector<double> CartesianForce::computeTorques(const vector<double>& q, const vector< vector<double> >& f_cart)
+{
   // Create KDL data types
     // inputs
   KDL::JntArray q_kdl;
@@ -136,7 +133,7 @@ vector<double> CartesianForce::computeTorques(const vector<double>& q, const vec
 
   // convert input to kdl
   kdl_control_tools::vectorStdToKdl(q, q_kdl);
-  for(int fi=0; fi < FINGER_COUNT; fi++)
+  for (int fi=0; fi < FINGER_COUNT; fi++)
     kdl_control_tools::vectorStdToKdl(f_cart[fi], f_kdl[fi]);
 
   // call the core method
@@ -149,4 +146,49 @@ vector<double> CartesianForce::computeTorques(const vector<double>& q, const vec
   return t_std;
 }
 
-} // end of namespace allegro_hand_kdl
+/*********************************************************************
+* Calculates cartesian wrenches, resulting from the given joint torques (tau).
+*********************************************************************/
+vector<KDL::Wrench> CartesianForce::computeWrenches(const KDL::JntArray& q, const KDL::JntArray& tau)
+{
+  // make sure that vector sizes are correct
+  unsigned int jnt_count = FINGER_COUNT * FINGER_LENGTH;
+  if (q.rows() != jnt_count || tau.rows() != jnt_count)
+  {
+    ROS_ERROR("CartesianForce: input lengths are wrong.");
+    return vector<KDL::Wrench>();
+  }
+
+  // empty wrench vector to return
+  vector<KDL::Wrench> w_vec(FINGER_COUNT);
+
+  // Repeat for each finger
+  for (int fi=0; fi < FINGER_COUNT; fi++)
+  {
+    // Create KDL data types
+    KDL::Jacobian jac(FINGER_LENGTH);
+
+    // Slice the finger joint angles & torques
+    KDL::JntArray q_fi, tau_fi;
+    q_fi.data = q.data.segment(fi*FINGER_LENGTH, FINGER_LENGTH);
+    tau_fi.data = tau.data.segment(fi*FINGER_COUNT, FINGER_LENGTH);
+
+    // Get the jacobian for desired configuration
+    int error = finger_solver_vec_[fi]->JntToJac(q_fi, jac);
+    if (error == -100)
+      ROS_ERROR("Cartesian force: failed to derive Jacobian, finger %d.", fi);
+
+    // Calculate the torque using jacobian
+    Eigen::VectorXd w_finger = jac.data * tau.data;
+
+    // append each dimension
+    for (int di=0; di < 3; di++)
+      w_vec[fi].force.data[di] = w_finger(di);
+    for (int di=3; di < 6; di++)
+      w_vec[fi].torque.data[di] = w_finger(di);
+  }
+  return w_vec;
+}
+
+
+}  // end of namespace allegro_hand_kdl

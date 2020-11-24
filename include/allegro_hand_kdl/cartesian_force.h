@@ -32,24 +32,20 @@
 #include <allegro_hand_kdl/allegro_kdl_config.h>
 #include <kdl_control_tools/kdl_helper.h>
 
-using namespace std;
-using namespace KDL;
-
 namespace allegro_hand_kdl
 {
 
+using std::vector;
 // CarteisanForce of allegro_hand_kdl package uses the KDL jacobian solver to
 // calculate the required joint torques to achieve desired cartesian forces.
 class CartesianForce
 {
   private:
-
     vector<ChainJntToJacSolver*> finger_solver_vec_;
 
     void createFingerSolvers_(AllegroKdlConfig& kdl_config);
 
   public:
-
     CartesianForce(AllegroKdlConfig& kdl_config);
     ~CartesianForce();
 
@@ -57,10 +53,10 @@ class CartesianForce
     KDL::JntArray computeTorques(const KDL::JntArray& q, const vector<KDL::JntArray>& f_cart);
     KDL::JntArray computeTorques(const KDL::JntArray& q, const vector<KDL::Wrench>& f_cart);
     vector<double> computeTorques(const vector<double>& q, const vector< vector<double> >& f_cart);
-
-
+    // returns the cartesian forces resulting from given joint torques
+    vector<KDL::Wrench> computeWrenches(const KDL::JntArray& q, const KDL::JntArray& tau);
 };
 
-} // end namespace allegro_hand_kdl
+}  // end namespace allegro_hand_kdl
 
 #endif // CARTESIAN_FORCE_H

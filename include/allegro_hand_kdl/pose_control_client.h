@@ -47,14 +47,16 @@ class PoseControlClient
     string behaviour_;
     vector<uint8_t> active_fingers_;
 
-    inline int findPose_(string ns, string name){
+    inline int findPose_(string ns, string name)
+    {
       // iterate existing poses (following pattern p0,p1...)
       int pi = 0;
-      while(ros::param::has(ns+"/p"+to_string(pi))){
+      while (ros::param::has(ns+"/p"+to_string(pi)))
+      {
         // compare the existing names to the searched name
         string current_name;
         ros::param::get(ns+"/p"+to_string(pi)+"/name", current_name);
-        if(current_name == name)
+        if (current_name == name)
           return pi;
         pi++;
       }
@@ -63,9 +65,8 @@ class PoseControlClient
     }
 
   public:
-
-    inline PoseControlClient(const string& srv_name, const string& behaviour=""):
-      behaviour_(behaviour) {
+    inline PoseControlClient(const string& srv_name, const string& behaviour=""): behaviour_(behaviour)
+    {
       nh_ = ros::NodeHandle();
       srv_ =
         nh_.serviceClient<allegro_hand_kdl::PoseRequest>(srv_name);
@@ -76,7 +77,7 @@ class PoseControlClient
     virtual void setTargetPose(vector<PoseType>& pose_vec, string name="tmp") = 0;
 
     // existing pose
-    void setTargetPose(string name){
+    void setTargetName(string name){
       target_name_ = name;
     }
 
@@ -89,23 +90,26 @@ class PoseControlClient
         active_fingers_[fi] = (bool) active_fingers[fi];
     }
 
-    void setActiveFingers(const vector<uint8_t>& active_fingers){
+    void setActiveFingers(const vector<uint8_t>& active_fingers)
+    {
       active_fingers_ = active_fingers;
     }
 
-    void activateAllFingers(){
+    void activateAllFingers()
+    {
       active_fingers_ = vector<uint8_t>(FINGER_COUNT, 1);
     }
 
     // keeps its current pose
-    inline bool maintainPose(){
-      setTargetPose("");
+    inline bool maintainPose()
+    {
+      setTargetName("");
       move();
     }
 
     // just calls the server to move
-    inline bool move(){
-
+    inline bool move()
+    {
       allegro_hand_kdl::PoseRequest req;
       req.request.pose = target_name_;
       req.request.behaviour = behaviour_;
@@ -130,8 +134,8 @@ class CartesianPoseClient : public PoseControlClient<geometry_msgs::Pose>
       // override/create param with the new values
       ros::param::set(pose_param_ns+"/p"+to_string(pi)+"/name", name);
       // set states for each finger
-      for(int fi=0; fi<pose_vec.size(); fi++){
-
+      for (int fi=0; fi < pose_vec.size(); fi++)
+      {
         string pose_path =
             pose_param_ns+"/p"+to_string(pi)+"/state/f"+to_string(fi);
         // position
@@ -145,7 +149,7 @@ class CartesianPoseClient : public PoseControlClient<geometry_msgs::Pose>
         ros::param::set(pose_path+"/rot/w", pose_vec[fi].orientation.w);
       }
       // set the target pose name for execution
-      PoseControlClient::setTargetPose(name);
+      PoseControlClient::setTargetName(name);
     }
 };
 
@@ -165,7 +169,7 @@ class JointPoseClient : public PoseControlClient<double>
       // set states for joints
       ros::param::set(pose_param_ns+"/p"+to_string(pi)+"/state", pose_vec);
       // set the target pose name for execution
-      PoseControlClient::setTargetPose(name);
+      PoseControlClient::setTargetName(name);
     }
 };
 

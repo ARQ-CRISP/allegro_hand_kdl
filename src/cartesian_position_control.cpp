@@ -211,7 +211,8 @@ bool CartesianPositionController::checkKdlObjects_() {
 * adding of single dimension of error
 * if the sign changed, the error resets
 *********************************************************************/
-double CartesianPositionController::addIntegralError_(const double e_total, const double e_last) {
+double CartesianPositionController::addIntegralError_(const double e_total, const double e_last)
+{
   // different signs?
   if(e_total * e_last < 0)
     // reset the error
@@ -224,7 +225,8 @@ double CartesianPositionController::addIntegralError_(const double e_total, cons
 /*********************************************************************
 * Accumulate the integral error for future. Apply decay to past error.
 *********************************************************************/
-void CartesianPositionController::updateIntegralError_(const HandPose& x, const HandPose& x_des, double t) {
+void CartesianPositionController::updateIntegralError_(const HandPose& x, const HandPose& x_des, double t)
+{
   // add the last error to integral error
   for(int fi=0; fi<FINGER_COUNT; fi++){
     if(!active_fingers_[fi]) continue; // skip inactive fingers
@@ -232,7 +234,9 @@ void CartesianPositionController::updateIntegralError_(const HandPose& x, const 
     KDL::Twist err_last =  KDL::diff(x[fi], x_des[fi]) * t;
 
     for(int di=0; di<3; di++) { // dimensions
+      // linear
       e_sum_vec_[fi][di] = addIntegralError_(e_sum_vec_[fi][di], err_last.vel[di]);
+      // angular
       e_sum_vec_[fi][di+3] = addIntegralError_(e_sum_vec_[fi][di+3], err_last.rot[di]);
     }
   }
@@ -240,33 +244,33 @@ void CartesianPositionController::updateIntegralError_(const HandPose& x, const 
 /*********************************************************************
 * Use internal timer to estimate velocity since last control
 *********************************************************************/
-void CartesianPositionController::estimateVelocity_(const double dt_update, const HandPose& x, HandVelocity& xd){
+void CartesianPositionController::estimateVelocity_(const double dt_update, const HandPose& x, HandVelocity& xd)
+{
+  // if x_last_ doesn't exist
+  if(x_last_.size() < FINGER_COUNT){
+    // zero velocity array
+    xd.resize(FINGER_COUNT);
 
-    // if x_last_ doesn't exist
-    if(x_last_.size() < FINGER_COUNT){
-      // zero velocity array
-      xd.resize(FINGER_COUNT);
+  // if no time passed yet
+  }else if(dt_update <= 0.0){
+    ROS_DEBUG("Cartesian position control: delta time is 0, multiple calls at the same moment!");
+    xd = vel_past_;
+    return;
 
-    // if no time passed yet
-    }else if(dt_update <= 0.0){
-      ROS_DEBUG("Cartesian position control: delta time is 0, multiple calls at the same moment!");
-      xd = vel_past_;
-      return;
-
-    // otherwise, the normal case
-    }else{
-      // differentiate x
-      for(int fi=0; fi<FINGER_COUNT; fi++){
-        KDL::Twist xd_cur = KDL::diff(x_last_[fi], x[fi], dt_update);
-        // smooth
-        xd_cur = (vel_past_[fi] *0.4 + xd_cur *0.6);
-        vel_past_[fi] = xd_cur;
-      }
-
-      xd = vel_past_;
+  // otherwise, the normal case
+  }else{
+    // differentiate x
+    for(int fi=0; fi<FINGER_COUNT; fi++){
+      KDL::Twist xd_cur = KDL::diff(x_last_[fi], x[fi], dt_update);
+      // smooth
+      xd_cur = (vel_past_[fi] *0.4 + xd_cur *0.6);
+      vel_past_[fi] = xd_cur;
     }
-    // update state
-    x_last_ = x;
+
+    xd = vel_past_;
+  }
+  // update state
+  x_last_ = x;
 }
 /*********************************************************************
 * Reset the accumulated integral error. Useful when changing goals.

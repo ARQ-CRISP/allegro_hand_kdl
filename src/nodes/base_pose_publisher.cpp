@@ -82,14 +82,16 @@ bool getParams(){
 
   string param_name;
   //*********
-  if(!ros::param::get("~robot_base", robot_base_) ){
+  if(!ros::param::get("~robot_base", robot_base_) )
+  {
     ROS_ERROR("Base pose publisher: Can't find robot_base param.");
     return -1;
   }
   ROS_INFO( "Base pose publisher: robot base frame: %s", robot_base_.c_str() );
 
   //*********
-  if(!ros::param::get("~hand_base", hand_base_) ){
+  if(!ros::param::get("~hand_base", hand_base_) )
+  {
     ROS_ERROR("Base pose publisher: Can't find hand_base param.");
     return -1;
   }
@@ -99,20 +101,22 @@ bool getParams(){
 }
 
 // read the current transform and publish hand_root pose
-void timerCallback(const ros::TimerEvent&){
-
+void timerCallback(const ros::TimerEvent&)
+{
   // get the transform info
   geometry_msgs::Transform tf_hand;
 
-  try{
+  try
+  {
     // transform of hand root w.r.t. robot base
     tf_hand = tfBuffer.lookupTransform(
       robot_base_,
       hand_base_,
       ros::Time(0)).transform;
   }
-  catch (tf2::TransformException &ex) {
-    ROS_WARN("%s",ex.what());
+  catch (tf2::TransformException &ex)
+  {
+    ROS_WARN("%s", ex.what());
     ros::Duration(1.0).sleep();
     return;
   }

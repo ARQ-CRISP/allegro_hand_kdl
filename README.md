@@ -119,7 +119,7 @@ The [JointPoseClient](include/allegro_hand_kdl/pose_control_client.h) (and [Cart
 ```c++
 JointPoseClient joint_client = JointPoseClient(nh);
 ...
-joint_client->setTargetPose("relax");
+joint_client->setTargetName("relax");
 joint_client->move();
 ...
 joint_client->setTargetPose(new_pose, "new_name");

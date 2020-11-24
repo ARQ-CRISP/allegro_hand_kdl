@@ -7,12 +7,15 @@
   <!-- control frequency -->
   <arg name="HZ" default="200"/>
 
+  <arg name="respawn" default="false"/>
+
   <arg name="INPUT_TOPIC" default="cartesian_forces" />
   <arg name="TORQUE_TOPIC" default="allegro_torque"/>
 
   <node name="control_force_$(arg LABEL)"
         type="control_force"
         pkg="allegro_hand_kdl"
+        respawn="$(arg respawn)"
         output="screen">
 
     <param name="hz" value="$(arg HZ)"/>

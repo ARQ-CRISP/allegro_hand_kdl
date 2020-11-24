@@ -398,8 +398,8 @@ void limitVector(KDL::Vector& vec, double lim){
 
 // creates the desired velocities for each finger.
 // Speed is limited v_lim_vel_ & v_lim_rot_
-HandVelocity limitedDesiredVelocity(const HandPose& x_cur){
-
+HandVelocity limitedDesiredVelocity(const HandPose& x_cur)
+{
   HandVelocity xd_des(FINGER_COUNT);
 
   // we evaluate each finger velocity separately
@@ -417,12 +417,14 @@ HandVelocity limitedDesiredVelocity(const HandPose& x_cur){
 }
 
 
-void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg) {
-
+void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
+{
   q_current_ = msg->position;
 }
 
-void timerCallback(const ros::TimerEvent&){
+
+void timerCallback(const ros::TimerEvent&)
+{
   // avoid working after finishing
   if(finished_ || q_current_.size() == 0) return;
 
@@ -467,8 +469,8 @@ void timerCallback(const ros::TimerEvent&){
 
 bool processPoseRequest(
       allegro_hand_kdl::PoseRequest::Request& req,
-      allegro_hand_kdl::PoseRequest::Response& res){
-
+      allegro_hand_kdl::PoseRequest::Response& res)
+{
   // read the pose (if exists)
   if(req.pose.size() > 0){
     HandPose pose = getDefinedPose(req.pose);
@@ -505,8 +507,8 @@ bool processPoseRequest(
 }
 
 // This procedure is called when the ros node is interrupted
-void sigintCallback(int sig){
-
+void sigintCallback(int sig)
+{
   stopMoving();
 
   // set finished state
@@ -519,8 +521,8 @@ void sigintCallback(int sig){
   ros::shutdown();
 }
 
-void displayDesiredPoses(const HandPose& x_des){
-
+void displayDesiredPoses(const HandPose& x_des)
+{
   visualization_msgs::MarkerArray marker_arr;
 
   for(int fi=0; fi<FINGER_COUNT; fi++){
@@ -553,6 +555,4 @@ void displayDesiredPoses(const HandPose& x_des){
   }
 
   vis_pub_.publish( marker_arr );
-
-
 }
