@@ -4,22 +4,7 @@
   <arg name="JSIZE" default="16"/>
   <arg name="PERIOD" default="0.005"/>
 
-  <!-- Adds the position control and gravity compensation -->
-  <node name="adder_gravity"
-        type="connector_node"
-        pkg="topic_connector"
-        output="screen" >
-
-    <!-- topic remappings -->
-    <remap from="in1" to="gravity_compensation_torque"/>
-    <remap from="in2" to="position_out"/>
-    <remap from="out" to="control_out"/>
-
-    <param name="connector_type" value="adder"/>
-    <param name="joint_count" value="$(arg JSIZE)"/>
-    <param name="period" value="$(arg PERIOD)"/>
-  </node>
-
+  <!-- switch between the position and manipulation -->
   <node name="switch_position"
         type="connector_node"
         pkg="topic_connector"
@@ -28,7 +13,7 @@
     <!-- topic remappings -->
     <remap from="in1" to="position_torque"/>
     <remap from="in2" to="manipulation_torque"/>
-    <remap from="out" to="position_out"/>
+    <remap from="out" to="control_out"/>
 
     <param name="connector_type" value="switch"/>
     <param name="joint_count" value="$(arg JSIZE)"/>
@@ -77,12 +62,29 @@
 
     <!-- topic remappings -->
     <remap from="in1" to="torque_unlimited"/>
-    <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
+    <remap from="out" to="torque_limited"/>
 
     <param name="limits/torque/upper" value="2.5" />
     <param name="limits/torque/lower" value="-2.5" />
 
     <param name="connector_type" value="limiter"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
+
+  <!-- Adds gravity compensation on top of the limiter, because we want it always-->
+  <node name="adder_gravity"
+        type="connector_node"
+        pkg="topic_connector"
+        output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="gravity_compensation_torque"/>
+    <remap from="in2" to="torque_limited"/>
+    <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
+
+    <param name="connector_type" value="adder"/>
     <param name="joint_count" value="$(arg JSIZE)"/>
     <param name="period" value="$(arg PERIOD)"/>
   </node>
