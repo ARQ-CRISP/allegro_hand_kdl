@@ -12,10 +12,16 @@
   <!-- optional name for the initial pose -->
   <arg name="POSE" default="" />
 
+  <!-- time before the controller gives up (seconds) -->
+  <arg name="TIME_LIMIT" default="4.0" />
+
   <!-- which rosparam namespace to read the predefined poses -->
   <arg name="NS_POSE" default="allegro_kdl/poses" />
 
   <arg name="TORQUE_TOPIC" default="position_torque"/>
+
+  <!-- joint velocity limit as radians -->
+  <arg name="VELOCITY_LIMIT" default="0.3"/>
 
   <!-- reload gains -->
   <rosparam file="$(find allegro_hand_kdl)/config/gains.yaml" command="load"
@@ -33,6 +39,8 @@
     <param name="pose_ns" value="$(arg NS_POSE)" />
     <param name="maintain_pose" value="$(arg MAINTAIN)" />
     <param name="initial_pose" value="$(arg POSE)" />
+    <param name="time_limit" value="$(arg TIME_LIMIT)" />
+    <param name="veloicity_limit" value="$(arg VELOCITY_LIMIT)" />
 
     <!-- topic remappings -->
     <remap from="joint_states" to="allegroHand_$(arg NUM)/joint_states"/>

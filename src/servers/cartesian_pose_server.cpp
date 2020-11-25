@@ -232,6 +232,13 @@ bool getParams(){
   if(ros::param::has("~hz"))
     ros::param::get("~hz", update_freq_);
 
+  // optional velocity limits (meters, radians)
+  if(ros::param::has("~velocity_limit_linear"))
+    ros::param::get("~velocity_limit_linear", v_lim_vel_);
+
+  if(ros::param::has("~velocity_limit_angular"))
+    ros::param::get("~velocity_limit_angular", v_lim_rot_);
+
   return true;
 }
 
@@ -367,13 +374,10 @@ void publishTorque(const KDL::JntArray& torque_vec){
     // joint torque is sum of the user input and compensation torques.
     double joint_torque = torque_vec(j);
 
-    // emergency stop
-    if(joint_torque > safety_torque_*1.5 || joint_torque < -safety_torque_*1.5){
-      ROS_WARN("Too much torque! %.3f", joint_torque);
-      stopMoving();
-      finished_ = true;
-      ros::spinOnce();
-      return;
+      // warn user of too much torque
+    if(joint_torque > safety_torque_ || joint_torque < -safety_torque_)
+    {
+      ROS_WARN("Too much torque! %.3f, joint %d", joint_torque, j);
     }
 
     // shave torque instead of emergency stop

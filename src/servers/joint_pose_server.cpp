@@ -186,6 +186,12 @@ bool getControlGains(ros::NodeHandle& nh, vector<double>& k_pos_vec, vector<doub
 // get external parameters if possible
 bool getParams()
 {
+  // time limit
+  if(!ros::param::get("~time_limit", time_limit_))
+  {
+    ROS_WARN("Joint Pose Server: Can't get time limit param.");
+  }
+
   // safety_torque
   if (!ros::param::get("/allegro_kdl/safety_torque", safety_torque_))
   {
@@ -237,6 +243,10 @@ bool getParams()
   // optional frequency parameter
   if (ros::param::has("~hz"))
     ros::param::get("~hz", update_freq_);
+
+  // optional velocity limit parameter (radians, same for all joints)
+  if (ros::param::has("~velocity_limit"))
+    ros::param::get("~velocity_limit", v_lim_);
 
   return true;
 
@@ -343,10 +353,10 @@ void publishTorque(const vector<double>& torque_vec)
     // joint torque is sum of the user input and compensation torques.
     double joint_torque = torque_vec[j];
 
-    // emergency stop
+    // warn user of too much torque
     if (joint_torque > safety_torque_ || joint_torque < -safety_torque_)
     {
-      ROS_WARN("Too much torque! %.3f", joint_torque);
+      ROS_WARN("Too much torque! %.3f, joint %d", joint_torque, j);
     }
 
     // shave torque instead of emergency stop
