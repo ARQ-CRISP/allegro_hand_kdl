@@ -86,11 +86,12 @@ int main(int argc, char** argv){
 
   // create float64 listener for intensity
   ros::Subscriber sub_intensity =
-  nh.subscribe<std_msgs::Float64>("envelop_intensity", 3, intensityCallback);
+    nh.subscribe<std_msgs::Float64>("envelop_intensity", 3, intensityCallback);
 
   // create joint state listener
   joint_pos_vec.resize(16);
-  nh.subscribe<sensor_msgs::JointState>( "joint_states", 3, jointStateCallback);
+  ros::Subscriber sub_state =
+    nh.subscribe<sensor_msgs::JointState>( "joint_states", 3, jointStateCallback);
 
 
   ros::Timer timer = nh.createTimer(ros::Duration(0.005), timerCallback);
@@ -319,20 +320,22 @@ void timerCallback(const ros::TimerEvent&){
 
 void sigintCallback(int sig)
 {
+  ROS_INFO("Envelop force: cleaning up on exit");
   // send and empty torque message
   sensor_msgs::JointState msg;
 
   msg.header.stamp = ros::Time::now();
 
-  msg.position.resize(16);
-  msg.velocity.resize(16);
-  msg.effort.resize(16);
+  msg.position.resize(16, 0.0);
+  msg.velocity.resize(16, 0.0);
+  msg.effort.resize(16, 0.0);
 
   for (int j=0; j < 16; j++){
-    msg.name.push_back("joint_"+to_string(j+1));
+    msg.name.push_back("joint_"+to_string(j));
   }
 
   torque_publisher.publish(msg);
+  ros::spinOnce();
 
   // send empty finger wrench messages and empty transforms
   vector< vector<double> > force_vec(FINGER_COUNT);
@@ -341,11 +344,7 @@ void sigintCallback(int sig)
   vector<geometry_msgs::TransformStamped> transformStamped;
   visualizeFingerWrenches(force_vec, transformStamped);
 
-  // inform user
-  ROS_INFO("Envelop force: cleaning up");
-
   // spin once to hand communication
-  ros::spinOnce();
   ros::spinOnce();
 
   // All the default sigint handler does is call shutdown()
