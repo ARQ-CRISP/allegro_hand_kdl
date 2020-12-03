@@ -50,8 +50,10 @@ unique_ptr<actionlib::SimpleActionServer<PoseControlAction> > as_;
 
 unique_ptr<CartesianPositionController> cartesian_control_;
 unique_ptr<JointPositionController> joint_control_;
+unique_ptr<Kinematics> kinematics_;
 
 ros::Publisher torque_pub_;
+ros::Publisher ik_poses_pub_;
 
 // params
 int hz_ = 200;
@@ -71,6 +73,7 @@ bool getDefinedPoses();
 bool readControlGains();
 bool getParams();
 bool publishTorque(const vector<double>& torque_vec);
+void publishPoses(const HandPose& pose_kdl);
 void stopMoving();
 vector<geometry_msgs::Pose> handPoseKdlToMsg(const HandPose &pose_kdl);
 HandPose handPoseMsgToKdl(const vector<geometry_msgs::Pose> &pose_msg);
@@ -95,6 +98,7 @@ int main(int argc, char **argv){
   allegro_config.parseKdl(nh);
   cartesian_control_.reset(new CartesianPositionController(allegro_config));
   joint_control_.reset(new JointPositionController());
+  kinematics_.reset(new Kinematics(allegro_config));
 
   // read & set control params
   readControlGains();
@@ -106,6 +110,10 @@ int main(int argc, char **argv){
     nh.advertise<sensor_msgs::JointState>("torque", 1);
   ros::Subscriber sub_js =
     nh.subscribe<sensor_msgs::JointState>("joint_states", 1, jointStateCallback, ros::TransportHints().tcpNoDelay().reliable());
+
+  // DEBUG
+  ik_poses_pub_ =
+    nh.advertise<geometry_msgs::PoseArray>("ik_poses", 1);
 
   // create an action server
   as_.reset(new actionlib::SimpleActionServer<PoseControlAction>(
@@ -191,7 +199,18 @@ void handleAction(const PoseControlGoalConstPtr &goal){
   ros::Time t_begin = ros::Time::now();
   ros::Duration limit_duration = ros::Duration(time_limit_);
 
-  if(goal->cartesian_pose.size() > 0) is_cartesian = true;
+
+  vector<double> ik_goal;
+  if(goal->cartesian_pose.size() > 0){
+    is_cartesian = true;
+    // inverse kinematics to get the goal in joint position
+    kinematics_->calcJointPos(q_current_, goal->cartesian_pose, ik_goal);
+
+    // DEBUG: visualize the ik targets in cartesian space
+    HandPose ikk_cart_pose;
+    kinematics_->calcCartPos(ik_goal, ikk_cart_pose);
+    publishPoses(ikk_cart_pose);
+  }
 
   ROS_DEBUG("Pose action server: executing action...");
 
@@ -207,11 +226,12 @@ void handleAction(const PoseControlGoalConstPtr &goal){
 
     if(is_cartesian){
       // feedback
-      HandPose pose_kdl = cartesian_control_->updatePose(q_current_);
-      feedback.cartesian_pose = handPoseKdlToMsg(pose_kdl);
+      HandPose current_pose_kdl;
+      kinematics_->calcCartPos(q_current_, current_pose_kdl);
+      feedback.cartesian_pose = handPoseKdlToMsg(current_pose_kdl);
       // control
-      vector<geometry_msgs::Twist> xd_des(FINGER_COUNT); // TODO: from average speed
-      torques = cartesian_control_->computeTorques(goal->cartesian_pose, xd_des);
+      vector<double> qd_des(FINGER_COUNT*FINGER_LENGTH); // TODO: from average speed
+      joint_control_->computeTorques(q_current_, ik_goal, qd_des, torques);
 
       if(checkFinished(goal->cartesian_pose, feedback.cartesian_pose)){
         success = true;
@@ -239,8 +259,8 @@ void handleAction(const PoseControlGoalConstPtr &goal){
     ROS_DEBUG("Pose action server: action is successful.");
     PoseControlResult result;
     if(is_cartesian){
-      HandPose pose_kdl = cartesian_control_->updatePose(q_current_);
-      result.cartesian_pose = handPoseKdlToMsg(pose_kdl);
+      HandPose current_pose_kdl = cartesian_control_->updatePose(q_current_);
+      result.cartesian_pose = handPoseKdlToMsg(current_pose_kdl);
     }else{
       result.joint_pose = q_current_;
     }
@@ -297,6 +317,17 @@ void stopMoving(){
   // send and empty torque message
   vector<double> zeros(FINGER_COUNT*FINGER_LENGTH);
   publishTorque(zeros);
+}
+
+void publishPoses(const HandPose& pose_kdl)
+{
+  geometry_msgs::PoseArray msg;
+  msg.header.stamp = ros::Time::now();
+  msg.header.frame_id = "hand_root";
+
+  msg.poses = handPoseKdlToMsg(pose_kdl);
+
+  ik_poses_pub_.publish(msg);
 }
 
 vector<geometry_msgs::Pose> handPoseKdlToMsg(const HandPose &pose_kdl){
