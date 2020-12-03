@@ -160,7 +160,7 @@ void timerCallback(const ros::TimerEvent&){
     msg_out.effort[j] *= kdl_scaler_;
 
     // names of joints
-    msg_out.name.push_back("joint_"+to_string(j+1));
+    msg_out.name.push_back("joint_"+to_string(j));
   }
 
   // send!
@@ -213,7 +213,7 @@ void sigintCallback(int sig){
   msg.effort.resize(FINGER_COUNT*FINGER_LENGTH);
 
   for (int j=0; j < FINGER_COUNT*FINGER_LENGTH; j++){
-    msg.name.push_back("joint_"+to_string(j+1));
+    msg.name.push_back("joint_"+to_string(j));
   }
 
   pub_.publish(msg);

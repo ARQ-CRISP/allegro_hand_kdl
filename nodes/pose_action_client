@@ -25,13 +25,17 @@ def main():
 
     # send the pose to the server
     goal = PoseControlGoal(cartesian_pose=finger_poses)
-    client.send_goal(goal)
+    client.send_goal(goal, feedback_cb=feedbackCallback)
+    # to test the feedback mechanism:
+    global feedbacks_received
+    feedbacks_received = False
 
     client.wait_for_result()
 
     print("pose_action_client: finished cartesian pose execution")
+    print("feedbacks received: "+ str(feedbacks_received))
 
-    rospy.sleep(3.0)
+    rospy.sleep(2.0)
     client.wait_for_server()
 
     # create a joint pose for testing
@@ -44,11 +48,22 @@ def main():
 
     # send the pose to the server
     goal = PoseControlGoal(joint_pose=joint_pose)
-    client.send_goal(goal)
+    client.send_goal(goal, feedback_cb=feedbackCallback)
+    # to test the feedback mechanism:
+    feedbacks_received = False
 
     client.wait_for_result()
 
     print("pose_action_client: finished joint pose execution")
+    print("feedbacks received: "+ str(feedbacks_received))
+
+
+def feedbackCallback(feedback):
+    global feedbacks_received
+    feedbacks_received = True
+
+    rospy.logdebug("pose_action_client: got feedback:")
+    rospy.logdebug(feedback)
 
 
 def list_to_pose(list):
@@ -61,6 +76,7 @@ def list_to_pose(list):
     pose.orientation.z = list[5]
     pose.orientation.w = list[6]
     return pose
+
 
 if __name__ == '__main__':
     try:

@@ -193,7 +193,7 @@ void handleAction(const PoseControlGoalConstPtr &goal){
 
   if(goal->cartesian_pose.size() > 0) is_cartesian = true;
 
-  ROS_INFO("Pose action server: action is being executed...");
+  ROS_DEBUG("Pose action server: executing action...");
 
   // loop until completed or preempted
   while(ros::ok() and !err_torque and !as_->isPreemptRequested()){
@@ -236,7 +236,7 @@ void handleAction(const PoseControlGoalConstPtr &goal){
   }
 
   if(success){
-    ROS_INFO("Pose action server: action is successful.");
+    ROS_DEBUG("Pose action server: action is successful.");
     PoseControlResult result;
     if(is_cartesian){
       HandPose pose_kdl = cartesian_control_->updatePose(q_current_);
@@ -248,7 +248,7 @@ void handleAction(const PoseControlGoalConstPtr &goal){
     as_->setSucceeded(result);
 
   }else{
-    ROS_INFO("Pose action server: action is preempted.");
+    ROS_DEBUG("Pose action server: action is preempted.");
     // set the action state to preempted
     as_->setPreempted();
   }
@@ -273,10 +273,9 @@ bool publishTorque(const vector<double>& torque_vec){
     // joint torque is sum of the user input and compensation torques.
     double joint_torque = torque_vec[j];
 
-    // emergency stop
+    // warn when the request causes the controller to generate too high torques
     if(joint_torque > safety_torque_ || joint_torque < -safety_torque_){
-      ROS_WARN("Too much torque! %.3f", joint_torque);
-      return false;
+      ROS_WARN("Too much torque! %.3f at joint %d", joint_torque, j);
     }
 
     // shave torque instead of emergency stop
@@ -286,7 +285,7 @@ bool publishTorque(const vector<double>& torque_vec){
     // add torques to message as effort
     msg.effort.push_back(joint_torque);
     // names of joints
-    msg.name.push_back("joint_"+to_string(j+1));
+    msg.name.push_back("joint_"+to_string(j));
   }
 
   torque_pub_.publish(msg);

@@ -241,7 +241,7 @@ void publishTorques(const vector<double> &tau){
     // add torques to message as effort
     msg.effort.push_back(joint_torque);
     // names of joints
-    msg.name.push_back("joint_"+to_string(j+1));
+    msg.name.push_back("joint_"+to_string(j));
   }
 
   torque_publisher.publish(msg);
