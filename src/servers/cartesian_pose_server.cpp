@@ -374,10 +374,10 @@ void publishTorque(const KDL::JntArray& torque_vec){
     // joint torque is sum of the user input and compensation torques.
     double joint_torque = torque_vec(j);
 
-      // warn user of too much torque
+    // warn user of too much torque
     if(joint_torque > safety_torque_ || joint_torque < -safety_torque_)
     {
-      ROS_WARN("Too much torque! %.3f, joint %d", joint_torque, j);
+      ROS_WARN("Cartesian pose server: Too much torque! %.3f, j: %d", joint_torque, j);
     }
 
     // shave torque instead of emergency stop

@@ -155,11 +155,10 @@ void publishTorques(const vector<double> &tau){
     // scale
     double joint_torque = tau[j] * 1.0;
 
-    // apply maximum torque limit for safety / inactive
-    if(joint_torque > safety_torque_*1.1 || joint_torque < -safety_torque_*1.1){
-      ROS_WARN("Force Control: Too much torque! Exiting...");
-      sigintCallback(0);
-      return;
+    // warn user of too much torque
+    if(joint_torque > safety_torque_ || joint_torque < -safety_torque_)
+    {
+      ROS_WARN("Force control: Too much torque! %.3f, j: %d", joint_torque, j);
     }
 
     // shave torque instead of emergency stop

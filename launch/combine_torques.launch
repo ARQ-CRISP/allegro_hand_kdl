@@ -36,7 +36,7 @@
     <param name="period" value="$(arg PERIOD)"/>
   </node>
 
-  <!-- Sums and applies grasp and control torques -->
+  <!-- Sums grasp and control torques -->
   <node name="adder_control"
     type="connector_node"
     pkg="topic_connector"
@@ -45,35 +45,14 @@
     <!-- topic remappings -->
     <remap from="in1" to="control_out"/>
     <remap from="in2" to="envelop_out"/>
-    <remap from="out" to="torque_unlimited"/>
+    <remap from="out" to="merged_torque"/>
 
     <param name="connector_type" value="adder"/>
     <param name="joint_count" value="$(arg JSIZE)"/>
     <param name="period" value="$(arg PERIOD)"/>
   </node>
 
-
-  <!-- Applies limits on the final torques -->
-  <node name="limiter_final"
-    type="connector_node"
-    pkg="topic_connector"
-    respawn="true"
-    output="screen" >
-
-    <!-- topic remappings -->
-    <remap from="in1" to="torque_unlimited"/>
-    <remap from="out" to="torque_limited"/>
-
-    <param name="limits/torque/upper" value="2.5" />
-    <param name="limits/torque/lower" value="-2.5" />
-
-    <param name="connector_type" value="limiter"/>
-    <param name="joint_count" value="$(arg JSIZE)"/>
-    <param name="period" value="$(arg PERIOD)"/>
-  </node>
-
-
-  <!-- Adds gravity compensation on top of the limiter, because we want it always-->
+  <!-- Adds gravity compensation on top of the merged torque-->
   <node name="adder_gravity"
         type="connector_node"
         pkg="topic_connector"
@@ -81,7 +60,7 @@
 
     <!-- topic remappings -->
     <remap from="in1" to="gravity_compensation_torque"/>
-    <remap from="in2" to="torque_limited"/>
+    <remap from="in2" to="merged_torque"/>
     <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
 
     <param name="connector_type" value="adder"/>

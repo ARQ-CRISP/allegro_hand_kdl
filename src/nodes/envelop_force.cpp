@@ -231,12 +231,15 @@ void publishTorques(const vector<double> &tau){
     // scale
     double joint_torque = tau[j];
 
-    // emergency stop
-    if(joint_torque > safety_torque_ || joint_torque < -safety_torque_){
-      ROS_WARN("Envelop force: Too much torque!");
-      sigintCallback(SIGINT);
-      return;
+    // warn user of too much torque
+    if(joint_torque > safety_torque_ || joint_torque < -safety_torque_)
+    {
+      ROS_WARN("Envelop force: Too much torque! %.3f, j: %d", joint_torque, j);
     }
+
+    // shave torque instead of emergency stop
+    joint_torque = max(joint_torque, -safety_torque_);
+    joint_torque = min(joint_torque, safety_torque_);
 
     // add torques to message as effort
     msg.effort.push_back(joint_torque);
