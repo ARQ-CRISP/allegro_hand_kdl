@@ -74,7 +74,7 @@ HandAcceleration CartesianPositionController::computeForces(const HandPose& x_de
 
   // Calc time since last control
   ros::Time t_now = ros::Time::now();
-  double dt_update = (t_now - t_update_).sec + 1e-9 * (t_now - t_update_).nsec;
+  double dt_update = (t_now - t_update_).toSec();
   // time init? too long delay? the memory variables are outdated
   if(dt_update > 0.5) {
     ROS_INFO("Cartesian position control: Re-initiated control state.");
@@ -247,18 +247,21 @@ void CartesianPositionController::updateIntegralError_(const HandPose& x, const 
 void CartesianPositionController::estimateVelocity_(const double dt_update, const HandPose& x, HandVelocity& xd)
 {
   // if x_last_ doesn't exist
-  if(x_last_.size() < FINGER_COUNT){
+  if(x_last_.size() < FINGER_COUNT)
+  {
     // zero velocity array
     xd.resize(FINGER_COUNT);
-
+    
   // if no time passed yet
-  }else if(dt_update <= 0.0){
+  } else if(dt_update < 1e-4)
+  {
     ROS_DEBUG("Cartesian position control: delta time is 0, multiple calls at the same moment!");
     xd = vel_past_;
     return;
 
   // otherwise, the normal case
-  }else{
+  } else
+  {
     // differentiate x
     for(int fi=0; fi<FINGER_COUNT; fi++){
       KDL::Twist xd_cur = KDL::diff(x_last_[fi], x[fi], dt_update);

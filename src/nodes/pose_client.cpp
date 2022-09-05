@@ -92,6 +92,6 @@ void timerCallback(const ros::TimerEvent&){
   joint_client->move();
 
   // increment phase
-  phase += PI / 10;
+  phase += PI / 8;
   phase = fmod(phase, PI);
 }

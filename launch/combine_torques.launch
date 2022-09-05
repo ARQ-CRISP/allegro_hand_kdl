@@ -4,6 +4,15 @@
   <arg name="JSIZE" default="16"/>
   <arg name="PERIOD" default="0.005"/>
 
+  <!-- whether to stop on too high torque values -->
+  <arg name="SAFETY_STOP" default="false" />
+  <arg name="SAFETY_THRESHOLD" default="3.0" />
+
+  <arg name="final_topic" default="allegroHand_$(arg NUM)/torque_cmd"/>
+
+  <arg if="$(arg SAFETY_STOP)" name="unlimited_topic" value="unlimited_torque"/>
+  <arg unless="$(arg SAFETY_STOP)" name="unlimited_topic" value="$(arg final_topic)"/>
+
   <!-- switch between the position and manipulation -->
   <node name="switch_position"
         type="connector_node"
@@ -61,10 +70,30 @@
     <!-- topic remappings -->
     <remap from="in1" to="gravity_compensation_torque"/>
     <remap from="in2" to="merged_torque"/>
-    <remap from="out" to="allegroHand_$(arg NUM)/torque_cmd"/>
+    <remap from="out" to="$(arg unlimited_topic)"/>
 
     <param name="connector_type" value="adder"/>
     <param name="joint_count" value="$(arg JSIZE)"/>
     <param name="period" value="$(arg PERIOD)"/>
   </node>
+
+  <!-- Optional: (if SAFETY_STOP) torque limiter -->
+  <node if="$(arg SAFETY_STOP)"
+        name="limit_torque"
+        type="connector_node"
+        pkg="topic_connector"
+        output="screen" >
+
+    <!-- topic remappings -->
+    <remap from="in1" to="$(arg unlimited_topic)"/>
+    <remap from="out" to="$(arg final_topic)"/>
+
+    <param name="limits/torque/upper" value="$(arg SAFETY_THRESHOLD)" />
+    <param name="limits/torque/lower" value="-$(arg SAFETY_THRESHOLD)" />
+
+    <param name="connector_type" value="limiter"/>
+    <param name="joint_count" value="$(arg JSIZE)"/>
+    <param name="period" value="$(arg PERIOD)"/>
+  </node>
+
 </launch>

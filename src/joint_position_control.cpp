@@ -78,11 +78,11 @@ void JointPositionController::computeTorques(const JntArray& q, const JntArray& 
 
   // Calc time since last control
   ros::Time t_now = ros::Time::now();
-  double dt_update = (t_now - t_update_).sec + 1e-9 * (t_now - t_update_).nsec;
+  double dt_update = (t_now - t_update_).toSec();
   // time init? too long delay? the memory variables are outdated
   if(dt_update > 0.5) {
-    ROS_INFO("JointPositionController: Re-initiated control state.");
-    dt_update = 0.0;
+    ROS_INFO("JointPositionController:\033[36m Re-initiated control state.\033[0m");
+    dt_update = 0.0; // so the integral error will not explode
     q_last_.resize(0);
     resetIntegralError_();
   }
@@ -216,18 +216,21 @@ void JointPositionController::resetIntegralError_(){
 void JointPositionController::estimateVelocity_(const double dt_update, const JntArray& q, JntArray& qd)
 {
   // if q_last_ doesn't exist
-  if(q_last_.rows() != q.rows()){
+  if(q_last_.rows() != q.rows())
+  {
     // zero velocity array
     qd = JntArray(q.rows());
 
   // if no time passed yet
-  }else if(dt_update <= 0.0){
-    ROS_DEBUG("JointPositionController: delta time is 0, multiple calls at the same moment!");
+  } else if(dt_update <= 1e-4)
+  {
+    ROS_WARN("JointPositionController: delta time is 0, multiple calls at the same moment!");
     qd.data = vel_past_;
     return;
 
   // otherwise, the normal case
-  }else{
+  } else
+  {
     // p_logger_->log("dt", dt_update);
     // differentiate q
     Eigen::VectorXd qd_eigen = (q.data - q_last_.data) / dt_update;
@@ -237,7 +240,6 @@ void JointPositionController::estimateVelocity_(const double dt_update, const Jn
     vel_past_ = qd_eigen;
 
     kdl_control_tools::arrayEigenToKdl(qd_eigen, qd);
-
   }
   // update state
   q_last_ = q;
