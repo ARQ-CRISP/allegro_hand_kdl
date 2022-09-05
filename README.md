@@ -13,14 +13,23 @@ apt install libeigen3-dev
 apt install ros-kinetic-orocos-kdl
 ```
 
-Install [*allegro-hand-ros (experimental branch)*](https://github.com/gokhansolak/allegro-hand-ros/tree/experimental) according to its README.
+Install [*allegro-hand-ros*](https://github.com/gokhansolak/allegro-hand-ros) according to its README.
 
-Clone this repository under catkin workspace and install dependencies:
+Clone this repository and its dependencies under catkin workspace:
 
 ```bash
+cd <your-catkin-ws>/src
 git clone https://github.com/ARQ-CRISP/allegro_hand_kdl.git
 git clone https://github.com/ARQ-CRISP/kdl_control_tools.git
 git clone https://github.com/ARQ-CRISP/ros_topic_connector.git
+```
+
+Run rosdep to install any other dependencies:
+
+```bash
+cd <your-catkin-ws>
+rosdep update
+rosdep install --from-paths src --ignore-src -r -y
 ```
 
 Build the catkin workspace.
